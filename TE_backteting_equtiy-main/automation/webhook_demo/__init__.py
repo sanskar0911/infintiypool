@@ -1,0 +1,3 @@
+"""
+Webhook demo package initialization.
+"""

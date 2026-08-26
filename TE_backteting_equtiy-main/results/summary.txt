@@ -1,0 +1,62 @@
+================================================================================
+FINAL STRATEGY FACT SHEET — SHANKH / DECUPLE INTERNSHIP 2026-27 (TE1)
+================================================================================
+
+1. STRATEGY SPECIFICATIONS & METADATA
+--------------------------------------------------------------------------------
+Strategy Name         : SMA Strategy
+Stock Ticker / Universe: INFY
+Hypothesis            : Quantitative momentum / trend following strategy
+Date Range            : 2020-01-01 to 2024-12-31
+Initial Capital        : INR 100,000.00
+Final Portfolio Value  : INR 102,561.60
+
+2. EXECUTION & PORTFOLIO RULES
+--------------------------------------------------------------------------------
+Position Allocation   : 20% max per trade
+Maximum Position Cap  : 10 simultaneous positions
+Rebalancing Frequency : Daily
+Transaction Cost Rate : 0.10% (0.1% per trade)
+Execution Slippage    : 0.05% (0.05% per trade)
+Stop Loss / Take Profit: SL 5.0% | TP 10.0%
+
+3. PERFORMANCE & RETURN METRICS
+--------------------------------------------------------------------------------
+Total Return          : 2.56%
+CAGR (Compound Ann)   : 0.51%
+Annualized Volatility : 2.13%
+Sharpe Ratio (Rf=0)   : 0.2527
+Sortino Ratio (Rf=0)  : 0.1833
+Maximum Drawdown (MDD): -4.04%
+
+4. TRADING & EXPOSURE STATISTICS
+--------------------------------------------------------------------------------
+Total Executed Trades : 10
+Trade Win Rate        : 40.00%
+Annual Portfolio Turnover: 40.77%
+Market Time Exposure  : 19.87%
+
+5. BENCHMARK COMPARISON (NIFTY50)
+--------------------------------------------------------------------------------
+Strategy CAGR vs Benchmark: 0.51% vs 16.10%
+Excess Annual Return   : -15.59%
+Strategy Sharpe vs Bench  : 0.25 vs 0.84
+Portfolio Beta        : 0.03
+Correlation with Bench: 0.29
+Information Ratio     : -0.78
+
+6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS
+--------------------------------------------------------------------------------
+Out-of-Sample Sharpe  : 0.0000
+Sharpe Degradation %  : 0.0%
+Validation Status     : PASSED
+
+7. RESEARCH VALIDATION WARNINGS & RISK AUDIT
+--------------------------------------------------------------------------------
+  ! INSUFFICIENT SAMPLE SIZE: Only 10 trades executed. Statistical error is high (min 30 required).
+  ! SUBOPTIMAL SHARPE: Sharpe Ratio of 0.25 is below the 0.5 threshold for systematic edge.
+  ! BENCHMARK UNDERPERFORMANCE: Strategy CAGR (0.51%) underperformed Nifty 50 (16.10%) by 15.59%.
+
+================================================================================
+Generated automatically by Equity Backtesting Framework.
+================================================================================
