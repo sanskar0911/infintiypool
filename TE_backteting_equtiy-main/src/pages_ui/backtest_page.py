@@ -2,6 +2,8 @@
 backtest_page.py
 
 Page 6 — Backtest Configuration & Interactive Simulation Terminal for QUANTLAB.
+Supports complete Execution Layer settings: Order Timing, Slippage bps, Commission bps,
+Position Sizing, Cash Constraints, and Short Selling policies.
 """
 
 import textwrap
@@ -10,7 +12,7 @@ import streamlit as st
 
 def render_backtest_page(config: dict, execute_callback):
     st.markdown("## ⚙️ Backtest Configuration Terminal")
-    st.caption("Side-by-side Configuration & Execution Simulation Engine")
+    st.caption("Side-by-side Configuration & Upgraded Execution Simulation Engine")
 
     col_config, col_preview = st.columns([1, 1])
 
@@ -39,11 +41,28 @@ def render_backtest_page(config: dict, execute_callback):
             overbought = st.number_input("Overbought Level", min_value=55.0, max_value=90.0, value=70.0)
             strategy_kwargs = {"period": rsi_p, "oversold": oversold, "overbought": overbought}
 
-        st.markdown("#### 3. Portfolio & Friction Controls")
+        st.markdown("#### 3. Execution Engine & Friction Controls")
         initial_capital = st.number_input("Initial Capital (INR)", min_value=10000.0, value=100000.0, step=10000.0)
         position_size = st.slider("Capital Allocation (%)", min_value=10, max_value=100, value=20, step=5) / 100.0
-        commission_pct = st.slider("Commission Fee (%)", min_value=0.0, max_value=1.0, value=0.1, step=0.05) / 100.0
-        slippage_pct = st.slider("Execution Slippage (%)", min_value=0.0, max_value=0.5, value=0.05, step=0.01) / 100.0
+
+        execution_timing = st.selectbox(
+            "Execution Timing",
+            ["NEXT_BAR_OPEN", "SAME_BAR_CLOSE", "NEXT_BAR_CLOSE"],
+            index=0,
+            help="NEXT_BAR_OPEN eliminates look-ahead bias by executing orders on next bar's Open price."
+        )
+
+        slippage_bps = st.number_input("Slippage (basis points)", min_value=0.0, max_value=200.0, value=10.0, step=1.0, help="10 bps = 0.10% price penalty")
+        commission_bps = st.number_input("Commission (basis points)", min_value=0.0, max_value=200.0, value=5.0, step=1.0, help="5 bps = 0.05% brokerage fee")
+
+        insufficient_cash = st.selectbox(
+            "Insufficient Cash Policy",
+            ["REDUCE_QUANTITY", "REJECT"],
+            index=0,
+            help="REDUCE_QUANTITY resizes trade to affordable cash. REJECT cancels order."
+        )
+
+        allow_short = st.selectbox("Allow Short Selling", ["OFF", "ON"], index=0) == "ON"
 
         run_clicked = st.button("🚀 RUN BACKTEST ENGINE", type="primary", use_container_width=True)
 
@@ -64,7 +83,9 @@ def render_backtest_page(config: dict, execute_callback):
                 <div>⚙️ <b>Strategy Architecture:</b> <span style="color: #60a5fa;">{strategy_name}</span></div>
                 <div>💵 <b>Initial Capital:</b> ₹{initial_capital:,.2f}</div>
                 <div>📊 <b>Position Sizing:</b> {position_size*100:.0f}%</div>
-                <div>💸 <b>Friction:</b> Comm {commission_pct*100:.2f}% | Slip {slippage_pct*100:.2f}%</div>
+                <div>⏱️ <b>Timing Mode:</b> <span style="color: #34d399;">{execution_timing}</span></div>
+                <div>💸 <b>Friction:</b> Comm {commission_bps} bps ({commission_bps/100:.2f}%) | Slip {slippage_bps} bps ({slippage_bps/100:.2f}%)</div>
+                <div>🛡️ <b>Cash Policy:</b> {insufficient_cash} | <b>Shorting:</b> {'Allowed' if allow_short else 'Disabled'}</div>
             </div>
         """)
         st.markdown(preview_html, unsafe_allow_html=True)
@@ -77,8 +98,13 @@ def render_backtest_page(config: dict, execute_callback):
                 "strategy_kwargs": strategy_kwargs,
                 "initial_capital": initial_capital,
                 "position_size": position_size,
-                "commission_pct": commission_pct,
-                "slippage_pct": slippage_pct,
+                "commission_pct": commission_bps / 10000.0,
+                "slippage_pct": slippage_bps / 10000.0,
+                "commission_bps": commission_bps,
+                "slippage_bps": slippage_bps,
+                "execution_timing": execution_timing,
+                "insufficient_cash_policy": insufficient_cash,
+                "allow_short_selling": allow_short,
                 "run_triggered": True
             }
             execute_callback(new_config)

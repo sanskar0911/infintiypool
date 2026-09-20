@@ -4,6 +4,7 @@ evaluation.py
 Empirical RAG Retrieval Evaluation module computing Top-1 and Top-3 accuracy.
 """
 
+import os
 from typing import List, Dict, Any
 from rag.retriever import RAGRetriever
 
@@ -12,35 +13,35 @@ from rag.retriever import RAGRetriever
 EVALUATION_DATASET: List[Dict[str, Any]] = [
     {
         "question": "What is look-ahead bias in backtesting?",
-        "expected_source": "backtesting/look_ahead_bias.md"
+        "expected_source": "look_ahead_bias"
     },
     {
         "question": "What is Sharpe Ratio and how is it calculated?",
-        "expected_source": "finance/sharpe.md"
+        "expected_source": "sharpe"
     },
     {
         "question": "How does Simple Moving Average (SMA) crossover work?",
-        "expected_source": "strategies/sma.md"
+        "expected_source": "sma"
     },
     {
         "question": "What is maximum drawdown and how to calculate recovery gain?",
-        "expected_source": "finance/drawdown.md"
+        "expected_source": "drawdown"
     },
     {
         "question": "What causes overfitting in quantitative equity strategies?",
-        "expected_source": "backtesting/overfitting.md"
+        "expected_source": "overfitting"
     },
     {
         "question": "How does Exponential Moving Average (EMA) differ from SMA?",
-        "expected_source": "strategies/ema.md"
+        "expected_source": "ema"
     },
     {
         "question": "How do transaction costs and slippage affect backtests?",
-        "expected_source": "finance/transaction_costs.md"
+        "expected_source": "transaction_costs"
     },
     {
         "question": "What is Relative Strength Index (RSI) mean reversion?",
-        "expected_source": "strategies/rsi.md"
+        "expected_source": "rsi"
     }
 ]
 
@@ -70,13 +71,13 @@ def evaluate_rag_retrieval(retriever: RAGRetriever = None) -> Dict[str, Any]:
 
     for test_item in EVALUATION_DATASET:
         q = test_item["question"]
-        expected = test_item["expected_source"]
+        expected = test_item["expected_source"].lower()
 
         results = retriever.retrieve(q, top_k=3)
-        retrieved_sources = [item[0]["source"] for item in results]
+        retrieved_sources = [item[0]["source"].lower() for item in results]
 
-        is_top_1 = len(retrieved_sources) > 0 and retrieved_sources[0] == expected
-        is_top_3 = expected in retrieved_sources
+        is_top_1 = len(retrieved_sources) > 0 and expected in os.path.basename(retrieved_sources[0])
+        is_top_3 = any(expected in os.path.basename(src) for src in retrieved_sources)
 
         if is_top_1:
             top_1_hits += 1

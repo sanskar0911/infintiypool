@@ -1,0 +1,57 @@
+[
+  {
+    "question": "What is Sharpe ratio?",
+    "language": "English",
+    "expected_sources": [
+      "knowledge_base/03_metrics/sharpe_ratio.md",
+      "knowledge_base/finance/sharpe.md"
+    ]
+  },
+  {
+    "question": "Sharpe ratio kya hota hai?",
+    "language": "Hindi",
+    "expected_sources": [
+      "knowledge_base/03_metrics/sharpe_ratio.md",
+      "knowledge_base/finance/sharpe.md"
+    ]
+  },
+  {
+    "question": "Sharpe ratio म्हणजे काय?",
+    "language": "Marathi",
+    "expected_sources": [
+      "knowledge_base/03_metrics/sharpe_ratio.md",
+      "knowledge_base/finance/sharpe.md"
+    ]
+  },
+  {
+    "question": "¿Qué es el CAGR?",
+    "language": "Spanish",
+    "expected_sources": [
+      "knowledge_base/03_metrics/cagr.md"
+    ]
+  },
+  {
+    "question": "Maximum drawdown म्हणजे काय?",
+    "language": "Marathi",
+    "expected_sources": [
+      "knowledge_base/03_metrics/maximum_drawdown.md",
+      "knowledge_base/finance/drawdown.md"
+    ]
+  },
+  {
+    "question": "How does Simple Moving Average (SMA) crossover work?",
+    "language": "English",
+    "expected_sources": [
+      "knowledge_base/02_strategies/sma_crossover.md",
+      "knowledge_base/strategies/sma.md"
+    ]
+  },
+  {
+    "question": "What is look-ahead bias in equity backtesting?",
+    "language": "English",
+    "expected_sources": [
+      "knowledge_base/06_biases/look_ahead_bias.md",
+      "knowledge_base/backtesting/look_ahead_bias.md"
+    ]
+  }
+]

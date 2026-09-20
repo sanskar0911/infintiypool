@@ -29,6 +29,11 @@ TE_backteting_equtiy-main/
 │
 ├── docs/                          # Comprehensive Technical Documentation
 │   ├── ARCHITECTURE.md            # System architecture & layer specifications
+│   ├── backtesting_engine.md      # Modular Order-Driven Engine Architecture
+│   ├── execution_model.md         # Point-in-time safe NEXT_BAR_OPEN execution timing
+│   ├── portfolio_state.md         # Mark-to-market portfolio state & P&L tracking
+│   ├── transaction_costs.md       # Basis points brokerage & transaction fee model
+│   ├── slippage.md                # Adverse price slippage model
 │   ├── EXPERIMENTS.md             # Parameter sweeps & experiment runner guide
 │   ├── VALIDATION.md              # Walk-forward, OOS split & bias prevention methodology
 │   └── LOOP_ENGINEERING.md        # LangGraph controlled state machine & decision rules
@@ -48,13 +53,28 @@ TE_backteting_equtiy-main/
 │   └── summary.txt                # Automated Strategy Fact Sheet & performance report
 │
 ├── tests/                         # Automated Unit Test Suite
-│   └── test_backtest_rules.py     # Pytest unit tests for look-ahead bias, costs, limits, splits
+│   ├── test_engine.py             # Unit tests for order, fill, slippage, costs, P&L
+│   └── test_backtest.py           # Legacy and system integration pytest suite
 │
 └── src/                           # Core Source Code Engine
     ├── __init__.py
+    ├── engine/                    # Modular Backtesting Engine Package
+    │   ├── __init__.py
+    │   ├── config.py              # BacktestConfig dataclass & timing enums
+    │   ├── order.py               # Order abstraction (BUY/SELL MARKET orders)
+    │   ├── position_sizing.py     # PositionSizer for capital allocation
+    │   ├── execution.py           # ExecutionModel & SlippageModel (NEXT_BAR_OPEN)
+    │   ├── cost_model.py          # TransactionCostModel for commissions
+    │   ├── fill.py                # Fill dataclass for trade records
+    │   ├── portfolio.py           # PortfolioManager & PositionTracker
+    │   ├── trade_log.py           # TradeLogger for canonical logs
+    │   ├── validation.py          # DataValidator data integrity checks
+    │   ├── result.py              # BacktestResult object & accessors
+    │   ├── engine.py              # Event-driven BacktestEngine bar-by-bar runner
+    │   └── demo.py                # Reproducible demo scenario script
     ├── main.py                    # Main orchestrator CLI & pipeline runner
-    ├── app.py                     # Institutional Streamlit Web Dashboard
-    ├── backtester.py              # Execution engine (costs, slippage, position caps, rebalancing)
+    ├── server.py                  # Standalone HTTP Web & API Server
+    ├── backtester.py              # Wrapper delegating to src.engine
     ├── portfolio.py               # Liquidity filtering, position limits & rebalancing schedule
     ├── benchmark.py               # Nifty 50 benchmark loader, return & risk comparison engine
     ├── strategy.py                # Facade module delegating to strategy library

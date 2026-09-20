@@ -230,21 +230,34 @@ def run_full_simulation(params: dict) -> dict:
     elif strategy_name == "RSI":
         strategy_kwargs = {"period": rsi_period, "oversold": oversold, "overbought": overbought}
 
-    df_signals = generate_signals(df, strategy_name=strategy_name, **strategy_kwargs)
+    # 3. Execute Backtest Simulation via Upgraded BacktestEngine
+    from engine import BacktestEngine, BacktestConfig, ExecutionTiming, InsufficientCashPolicy
 
-    # 3. Execute Backtest Simulation
-    portfolio_df, trade_log_df = run_backtest(
-        df_signals,
+    execution_timing = params.get("execution_timing", "NEXT_BAR_OPEN")
+    commission_bps = float(params.get("commission_bps", txn_cost_rate * 10000.0))
+    slippage_bps = float(params.get("slippage_bps", slippage_rate * 10000.0))
+    insufficient_cash = params.get("insufficient_cash_policy", "REDUCE_QUANTITY")
+    allow_short = bool(params.get("allow_short_selling", False))
+
+    config = BacktestConfig(
         initial_capital=initial_capital,
-        txn_cost_rate=txn_cost_rate,
-        slippage_rate=slippage_rate,
         position_size=position_size,
+        commission_bps=commission_bps,
+        slippage_bps=slippage_bps,
+        execution_timing=ExecutionTiming(execution_timing) if isinstance(execution_timing, str) else execution_timing,
+        insufficient_cash_policy=InsufficientCashPolicy(insufficient_cash) if isinstance(insufficient_cash, str) else insufficient_cash,
+        allow_short_selling=allow_short,
         stop_loss=stop_loss,
         take_profit=take_profit
     )
 
-    # 4. Calculate Quantitative Metrics
-    metrics = calculate_metrics(portfolio_df, trade_log_df, initial_capital=initial_capital)
+    engine = BacktestEngine(config)
+    res = engine.run(df_signals, symbol=ticker)
+    portfolio_df = res.portfolio_history
+    trade_log_df = res.trade_log_df
+    metrics = res.metrics
+    exec_stats = res.execution_statistics
+    exec_trace = res.execution_trace
 
     # 5. Multi-Metric Recommendation & Evaluation Engine
     recommendations = evaluate_and_recommend_strategies(
@@ -366,7 +379,9 @@ def run_full_simulation(params: dict) -> dict:
         "charts": chart_images,
         "ai_analysis": ai_analysis,
         "benchmark_comp": bench_comp,
-        "recommendations": recommendations
+        "recommendations": recommendations,
+        "execution_statistics": exec_stats,
+        "execution_trace": exec_trace
     }
 
 
@@ -1213,12 +1228,22 @@ INDEX_HTML = """<!DOCTYPE html>
 
             <!-- RAG Research Tab -->
             <div id="info-rag" class="info-content hidden">
-                <div class="rag-input-group">
-                    <input type="text" id="rag-query-input" class="rag-input" placeholder="Ask quantitative knowledge base (e.g. 'What is Sharpe Ratio formula?')">
-                    <button class="btn-primary" id="rag-search-btn">Ask AI</button>
+                <div style="margin-bottom: 1.2rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.25); padding: 0.8rem; border-radius: 0.5rem; border: 1px solid var(--card-border);">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.3rem;">🧪 Demo Queries:</span>
+                    <button class="btn-secondary demo-q-btn" onclick="runDemoQuery('What is Sharpe ratio?')">🇬🇧 English: Sharpe Ratio</button>
+                    <button class="btn-secondary demo-q-btn" onclick="runDemoQuery('Sharpe ratio kya hota hai?')">🇮🇳 Hindi: Sharpe Ratio</button>
+                    <button class="btn-secondary demo-q-btn" onclick="runDemoQuery('Sharpe ratio म्हणजे काय?')">🚩 Marathi: Sharpe Ratio</button>
+                    <button class="btn-secondary demo-q-btn" onclick="runDemoQuery('¿Qué es el CAGR?')">🇪🇸 Spanish: CAGR</button>
+                    <button class="btn-secondary demo-q-btn" onclick="runDemoQuery('Maximum drawdown म्हणजे काय?')">🚩 Marathi: Max DD</button>
                 </div>
-                <div class="ai-card" id="rag-response-container">
-                    <p style="color: var(--text-secondary);">Type a query above to search grounded knowledge base.</p>
+                <div class="rag-input-group" style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem;">
+                    <input type="text" id="rag-query-input" class="rag-input" style="flex-grow: 1; padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--card-border); background: #161c2d; color: var(--text-primary); font-size: 0.9rem;" placeholder="Type quantitative question in any language (e.g. 'Sharpe ratio म्हणजे काय?')...">
+                    <button class="btn-primary" id="rag-search-btn" style="white-space: nowrap;">🚀 Execute AI Pipeline</button>
+                </div>
+                <div id="rag-response-container">
+                    <p style="color: var(--text-secondary); padding: 2rem; text-align: center; border: 1px dashed var(--card-border); border-radius: 0.5rem;">
+                        Select an interactive demo query above or enter a question to inspect the complete 8-Stage QUANTLAB Multilingual MADRID AI Pipeline.
+                    </p>
                 </div>
             </div>
 
@@ -1633,33 +1658,160 @@ INDEX_HTML = """<!DOCTYPE html>
             }
         }
 
+        function runDemoQuery(qText) {
+            ragQueryInput.value = qText;
+            handleRAGSearch();
+        }
+
         async function handleRAGSearch() {
             const query = ragQueryInput.value.trim();
             if (!query) return;
             ragSearchBtn.disabled = true;
-            ragResponseContainer.innerHTML = `<p style="color: var(--text-secondary);">Searching Knowledge Base...</p>`;
+            ragResponseContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="font-weight: 700; color: var(--accent-primary); margin-bottom: 0.5rem; font-size: 1.1rem;">⚡ Executing QUANTLAB Multilingual MADRID RAG Pipeline...</div>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Processing Language Detection ➔ MADRID Translation ➔ Vector Search ➔ LLM Synthesis ➔ Target Decoding...</p>
+                </div>
+            `;
 
             try {
-                const res = await fetch('/api/rag', {
+                const res = await fetch('/api/rag/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: query })
                 });
                 const data = await res.json();
-                ragResponseContainer.innerHTML = `
-                    <div style="font-weight: 700; margin-bottom: 0.5rem; color: var(--accent-primary);">AI Response:</div>
-                    <p style="margin-bottom: 0.8rem;">${data.answer}</p>
-                    ${data.sources && data.sources.length > 0 ? `
-                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                            <strong>Sources:</strong> ${data.sources.join(', ')}
-                        </div>
-                    ` : ''}
-                `;
+                renderPipelineResults(data);
             } catch (e) {
-                ragResponseContainer.innerHTML = `<p style="color: var(--accent-red);">Error executing RAG search: ${e.message}</p>`;
+                ragResponseContainer.innerHTML = `<p style="color: var(--accent-red); padding: 1.5rem;">Error executing RAG search: ${e.message}</p>`;
             } finally {
                 ragSearchBtn.disabled = false;
             }
+        }
+
+        function renderPipelineResults(data) {
+            if (!data) return;
+            const ts = data.token_stats || {};
+            const lat = data.stage_latencies_ms || {};
+            const diffPct = ts.observed_token_difference_pct || 0;
+            const isDiffNeg = diffPct <= 0;
+            const diffColor = isDiffNeg ? 'var(--accent-green)' : 'var(--accent-amber)';
+
+            const sourcesHtml = (data.retrieved_sources || []).map((s, idx) => `
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 0.4rem; padding: 0.75rem; margin-top: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 0.3rem;">
+                        <span style="font-weight: 700; color: var(--accent-primary);">📄 [${idx+1}] ${s.source}</span>
+                        <span style="background: rgba(59,130,246,0.15); color: var(--accent-primary); padding: 0.1rem 0.4rem; border-radius: 0.2rem; font-family: var(--font-mono); font-weight: 600;">Similarity: ${(s.similarity_score * 100).toFixed(1)}%</span>
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); font-style: italic;">Topic: ${s.topic} | Section: ${s.section}</div>
+                    <p style="font-size: 0.8rem; margin-top: 0.4rem; color: #cbd5e1; font-family: var(--font-mono); background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 0.3rem; max-height: 100px; overflow-y: auto;">
+                        ${s.text.length > 250 ? s.text.substring(0, 250) + '...' : s.text}
+                    </p>
+                </div>
+            `).join('');
+
+            ragResponseContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Title & Overview Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); padding: 0.8rem 1.2rem; border-radius: 0.5rem;">
+                        <div>
+                            <span style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">QUANTLAB AI RESEARCH PIPELINE</span>
+                            <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 0.5rem;">(Execution Latency: ${data.total_latency_ms || 0} ms)</span>
+                        </div>
+                        <span class="badge badge-buy">STATUS: ${(data.status || "SUCCESS").toUpperCase()}</span>
+                    </div>
+
+                    <!-- 8 Connected Stage Visual Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+                        <!-- Stage 1 -->
+                        <div class="metric-card" style="border-left: 4px solid var(--accent-primary);">
+                            <div class="metric-label">1. USER INPUT</div>
+                            <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem;">"${data.original_query}"</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary);">Chars: ${data.original_query.length} | Input Tokens: ${ts.original_input_tokens || 0}</div>
+                        </div>
+
+                        <!-- Stage 2 -->
+                        <div class="metric-card" style="border-left: 4px solid var(--accent-green);">
+                            <div class="metric-label">2. LANGUAGE DETECTION</div>
+                            <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent-green); margin-bottom: 0.3rem;">${data.detected_language} (${data.language_code})</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary);">Automatic detection ✓ | Latency: ${lat.stage_1_2_detection_ms || 0} ms</div>
+                        </div>
+
+                        <!-- Stage 3 -->
+                        <div class="metric-card" style="border-left: 4px solid #8b5cf6;">
+                            <div class="metric-label">3. MADRID TRANSLATION</div>
+                            <div style="font-family: var(--font-mono); font-size: 0.78rem; color: #c084fc; margin-bottom: 0.3rem; word-break: break-all;">${data.madrid_query}</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary);">MADRID Tokens: ${ts.madrid_input_tokens || 0} (<span style="color: ${diffColor}; font-weight:700;">${diffPct >= 0 ? '+' : ''}${diffPct}%</span> vs original)</div>
+                        </div>
+
+                        <!-- Stage 4 & 5 -->
+                        <div class="metric-card" style="border-left: 4px solid #f59e0b;">
+                            <div class="metric-label">4 & 5. RAG RETRIEVAL & KNOWLEDGE</div>
+                            <div style="font-weight: 700; font-size: 0.95rem; color: #fbbf24; margin-bottom: 0.3rem;">${(data.retrieved_sources || []).length} Chunks Retrieved</div>
+                            <div style="font-size: 0.78rem; color: var(--text-secondary);">Top-K: 3 | Vector Search Latency: ${lat.stage_4_5_retrieval_ms || 0} ms</div>
+                        </div>
+                    </div>
+
+                    <!-- Retrieved Sources Section -->
+                    <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); padding: 1rem; border-radius: 0.5rem;">
+                        <div style="font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--accent-primary); letter-spacing: 0.05em; margin-bottom: 0.5rem;">
+                            📚 Grounded Knowledge Base Sources
+                        </div>
+                        ${sourcesHtml || '<p style="color:var(--text-secondary); font-size:0.85rem;">No sources found.</p>'}
+                    </div>
+
+                    <!-- Stage 6, 7 & Final Output -->
+                    <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 1.2rem; border-radius: 0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                            <span style="font-weight: 800; font-size: 0.95rem; color: var(--accent-green); display: flex; align-items: center; gap: 0.4rem;">
+                                💬 8. FINAL USER RESPONSE (${data.detected_language})
+                            </span>
+                            <span style="font-size: 0.78rem; color: var(--text-secondary);">Target Language Decoding: Complete ✓</span>
+                        </div>
+                        <div style="font-size: 0.92rem; line-height: 1.6; color: var(--text-primary); white-space: pre-line; background: rgba(0,0,0,0.25); padding: 1rem; border-radius: 0.4rem; border-left: 3px solid var(--accent-green);">
+                            ${data.final_answer}
+                        </div>
+                    </div>
+
+                    <!-- Scientific Token Accounting Panel -->
+                    <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(59, 130, 246, 0.3); padding: 1.2rem; border-radius: 0.5rem;">
+                        <div style="font-weight: 700; font-size: 0.85rem; text-transform: uppercase; color: var(--accent-primary); letter-spacing: 0.05em; margin-bottom: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span>📊 QUANTLAB TOKEN ANALYTICS & ACCOUNTING</span>
+                            <span style="font-family: var(--font-mono); font-size: 0.8rem; color: ${diffColor};">Observed Difference: ${ts.observed_token_difference_pct || 0}%</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem; text-align: center;">
+                            <div style="background: rgba(0,0,0,0.3); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--text-secondary);">Original Query</div>
+                                <div style="font-size: 1.1rem; font-weight: 700;">${ts.original_input_tokens || 0}</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.3); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--text-secondary);">MADRID Query</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #c084fc;">${ts.madrid_input_tokens || 0}</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.3); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--text-secondary);">RAG Context</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: #fbbf24;">${ts.rag_context_tokens || 0}</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.3); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--text-secondary);">LLM Input</div>
+                                <div style="font-size: 1.1rem; font-weight: 700;">${ts.llm_input_tokens || 0}</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.3); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--text-secondary);">LLM Output</div>
+                                <div style="font-size: 1.1rem; font-weight: 700;">${ts.llm_output_tokens || 0}</div>
+                            </div>
+                            <div style="background: rgba(0,0,0,0.3); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--text-secondary);">Final Output</div>
+                                <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-green);">${ts.final_translation_tokens || 0}</div>
+                            </div>
+                            <div style="background: rgba(59,130,246,0.15); border: 1px solid var(--accent-primary); padding: 0.6rem; border-radius: 0.4rem;">
+                                <div style="font-size: 0.72rem; color: var(--accent-primary); font-weight:700;">Total Tokens</div>
+                                <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary);">${ts.total_tokens || 0}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // Event Listeners
@@ -1728,11 +1880,11 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(stocks_data).encode("utf-8"))
             return
 
-        # 5. RAG API (GET query parameter fallback)
-        elif path == "/api/rag":
+        # 5. RAG API (/api/rag and /api/rag/query)
+        elif path in ["/api/rag", "/api/rag/query"]:
             q_text = query.get("query", [""])[0]
             chain = RAGChain()
-            rag_res = chain.answer_question(q_text)
+            rag_res = chain.execute_pipeline(q_text)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -1784,10 +1936,10 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode("utf-8"))
             return
 
-        elif path == "/api/rag":
+        elif path in ["/api/rag", "/api/rag/query"]:
             query_str = payload.get("query", "")
             chain = RAGChain()
-            rag_res = chain.answer_question(query_str)
+            rag_res = chain.execute_pipeline(query_str)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()

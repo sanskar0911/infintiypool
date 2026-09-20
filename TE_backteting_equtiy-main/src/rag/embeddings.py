@@ -13,8 +13,8 @@ _MODEL = None
 
 if importlib.util.find_spec("sentence_transformers") is not None:
     try:
-        from sentence_transformers import SentenceTransformer
-        _MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        st_mod = importlib.import_module("sentence_transformers")
+        _MODEL = st_mod.SentenceTransformer("all-MiniLM-L6-v2")
         HAS_SENTENCE_TRANSFORMERS = True
     except Exception:
         HAS_SENTENCE_TRANSFORMERS = False

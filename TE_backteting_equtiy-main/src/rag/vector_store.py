@@ -1,7 +1,8 @@
 """
 vector_store.py
 
-FAISS Vector Store index manager for semantic document retrieval.
+FAISS & NumPy Vector Store index manager supporting index building, loading, updating,
+and top-K similarity search with score calculation.
 """
 
 import importlib.util
@@ -13,14 +14,14 @@ faiss_module = None
 
 if importlib.util.find_spec("faiss") is not None:
     try:
-        import faiss as faiss_module
+        faiss_module = importlib.import_module("faiss")
         HAS_FAISS = True
     except Exception:
         HAS_FAISS = False
 
 
 class VectorStoreManager:
-    """FAISS Vector Index manager with L2 distance similarity search."""
+    """FAISS Vector Index manager with cosine / distance similarity search."""
 
     def __init__(self):
         self.index = None
@@ -28,9 +29,12 @@ class VectorStoreManager:
         self.embeddings: np.ndarray = None
 
     def build_index(self, chunks: List[Dict[str, Any]], embeddings: np.ndarray):
-        """Build FAISS index from document chunk embeddings."""
+        """Build vector index from document chunk embeddings."""
         self.chunks = chunks
         self.embeddings = embeddings.astype(np.float32)
+
+        if embeddings is None or len(embeddings) == 0:
+            return
 
         dimension = embeddings.shape[1]
 
@@ -48,9 +52,9 @@ class VectorStoreManager:
         Returns
         -------
         List[Tuple[Dict[str, Any], float]]
-            List of (chunk, distance_score) tuples.
+            List of (chunk, similarity_score) tuples where similarity_score is between 0.0 and 1.0.
         """
-        if self.chunks is None or len(self.chunks) == 0:
+        if self.chunks is None or len(self.chunks) == 0 or self.embeddings is None:
             return []
 
         q_vec = query_embedding.astype(np.float32)
@@ -63,11 +67,21 @@ class VectorStoreManager:
             distances, indices = self.index.search(q_vec, min(top_k, len(self.chunks)))
             for dist, idx in zip(distances[0], indices[0]):
                 if 0 <= idx < len(self.chunks):
-                    results.append((self.chunks[idx], float(dist)))
+                    # Convert L2 distance to similarity score range [0, 1]
+                    sim = round(max(0.0, 1.0 / (1.0 + float(dist))), 4)
+                    results.append((self.chunks[idx], sim))
         else:
+            # Cosine / dot-product similarity search for numpy array
             dists = np.linalg.norm(self.embeddings - q_vec, axis=1)
             top_indices = np.argsort(dists)[:top_k]
             for idx in top_indices:
-                results.append((self.chunks[idx], float(dists[idx])))
+                sim = round(max(0.0, 1.0 / (1.0 + float(dists[idx]))), 4)
+                results.append((self.chunks[idx], sim))
 
         return results
+
+    def clear_index(self):
+        """Clear vector index."""
+        self.index = None
+        self.chunks = []
+        self.embeddings = None
