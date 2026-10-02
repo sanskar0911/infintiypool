@@ -1,0 +1,11 @@
+# QuantLab Backtesting Engine Configuration
+initial_capital: 10000000
+capital_allocation_per_trade: 0.02
+risk_free_rate: 0.06
+strategy_mode: long_only   # supported: long_only, short_only, long_short
+position_sizing: fixed     # supported: fixed (initial capital * allocation), compounding (current capital * allocation)
+transaction_cost: 0.0      # per-trade transaction cost percentage or amount
+slippage: 0.0              # per-trade slippage percentage
+tolerance: 0.0001          # float comparison tolerance for Excel vs Python reconciliation
+output_dir: output
+openai_model: gpt-4o-mini

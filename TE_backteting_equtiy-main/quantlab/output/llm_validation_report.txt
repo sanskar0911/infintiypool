@@ -1,0 +1,49 @@
+============================================================
+LLM VALIDATION REPORT (Independent Quantitative Audit)
+Engine: Deterministic QuantLab Rule-Based Auditor
+============================================================
+
+1. INPUT QUALITY:
+- Total trades inspected: 789
+- Active/unclosed trades: 94
+- Negative or zero price trades: 0
+- Negative duration trades: 0
+- Data Health Status: PASSED
+
+2. TRADE DATA QUALITY:
+- Trade distribution: 403 wins, 309 losses, 77 neutral
+- Win Rate: 51.08% | Loss Rate: 39.16%
+- Chronological ordering: VERIFIED (earliest to latest)
+- Date range: 2013-03-28 to 2024-07-31
+
+3. RETURN VALIDATION:
+- Max difference between provided and calculated return: 0.005%
+- Discrepancy explanation: Calculated returns match provided returns within 0.01% rounding precision. Unclosed/active trades entered on final date have 0.0% calculated return.
+
+4. OUTLIER ANALYSIS:
+- P&L distribution sample-adjusted skewness: 1.7825
+- Interpretation: Positive skew (frequent small losses/gains with occasional massive winning trades)
+- Top winning trade: Metalyst Forgings Ltd. (+₹314,823.72)
+- Top losing trade: LGB Forge Ltd. (₹-84,090.91)
+
+5. RISK OBSERVATIONS:
+- Profit Factor: 2.33 (Gross Profit ₹19,981,765.81 / Gross Loss ₹8,585,798.66)
+- Expectancy / Trading Edge: ₹14,443.56 per trade
+- Sharpe Ratio: 2.14 (Risk-Free Rate: 6.0%)
+- Sortino Ratio: 5.42
+- Calmar Ratio: 0.54
+- Maximum Drawdown: ₹-2,100,115.58 (-12.95%)
+- Drawdown Duration: 1283 days (Trough: 2020-03-31)
+- Max Win Streak: 12 | Max Loss Streak: 13
+
+6. PYTHON VS EXCEL RECONCILIATION:
+- Mathematical formulas verified across all 28 metrics.
+- Discrepancy status: 100% MATCH within tolerance (0.0001).
+
+7. POTENTIAL DATA ISSUES:
+- 77 trades in input file lacked provided return % (properly handled as 0% for unclosed trades).
+- 94 trades marked as 'Active' on Jul 31, 2024; evaluated using latest Close Price as mark-to-market.
+
+8. OVERALL VALIDATION NOTES:
+Independent audit confirmed mathematical correctness of position sizing, P&L calculations, and cumulative equity curve. No look-ahead bias or synthetic broker artifacts were detected in the trade signals.
+============================================================

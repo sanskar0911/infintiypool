@@ -89,8 +89,9 @@ def calculate_metrics(
     if not trade_log_df.empty:
         # Filter buys and sells
         type_col = "BUY/SELL" if "BUY/SELL" in trade_log_df.columns else "Type"
-        buys = trade_log_df[trade_log_df[type_col] == "BUY"]
-        sells = trade_log_df[trade_log_df[type_col] == "SELL"]
+        type_str = trade_log_df[type_col].astype(str).str.upper()
+        buys = trade_log_df[type_str.str.contains("BUY")]
+        sells = trade_log_df[type_str.str.contains("SELL")]
         n_trades = min(len(buys), len(sells))
         
         for idx in range(n_trades):

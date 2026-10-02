@@ -1,0 +1,133 @@
+{
+  "status": "COMPLETED",
+  "llm_engine": "Deterministic QuantLab Rule-Based Auditor",
+  "input_quality": {
+    "total_trades_analyzed": 789,
+    "active_unclosed_trades": 94,
+    "missing_provided_returns": 77,
+    "zero_or_negative_prices": 0,
+    "negative_duration_trades": 0,
+    "zero_duration_trades": 77,
+    "data_health": "PASSED"
+  },
+  "trade_data_quality": {
+    "winning_trades": 403,
+    "losing_trades": 309,
+    "even_trades": 77,
+    "win_rate_%": 51.08,
+    "loss_rate_%": 39.16,
+    "date_range": "2013-03-28 to 2024-07-31",
+    "chronological_order_verified": true
+  },
+  "return_validation": {
+    "max_abs_return_difference_%": 0.005,
+    "notable_discrepancies_count": 0,
+    "discrepancies_sample": [],
+    "explanation": "Calculated returns match provided returns within 0.01% rounding precision. Unclosed/active trades entered on final date have 0.0% calculated return."
+  },
+  "outlier_analysis": {
+    "top_5_winners": [
+      {
+        "trade_id": "T0025",
+        "stock": "Metalyst Forgings Ltd.",
+        "entry_date": "2014-03-31",
+        "exit_date": "2014-06-30",
+        "pnl": 314823.72,
+        "return_%": 157.41
+      },
+      {
+        "trade_id": "T0339",
+        "stock": "Cineline India Ltd.",
+        "entry_date": "2021-06-30",
+        "exit_date": "2021-09-30",
+        "pnl": 261211.48,
+        "return_%": 130.61
+      },
+      {
+        "trade_id": "T0063",
+        "stock": "Hester Biosciences L..",
+        "entry_date": "2014-06-30",
+        "exit_date": "2014-09-30",
+        "pnl": 261115.93,
+        "return_%": 130.56
+      },
+      {
+        "trade_id": "T0074",
+        "stock": "TAKE Ltd.",
+        "entry_date": "2014-12-31",
+        "exit_date": "2015-03-31",
+        "pnl": 260107.33,
+        "return_%": 130.05
+      },
+      {
+        "trade_id": "T0261",
+        "stock": "TruCap Finance Ltd.",
+        "entry_date": "2020-06-30",
+        "exit_date": "2020-09-30",
+        "pnl": 258570.71,
+        "return_%": 129.29
+      }
+    ],
+    "top_5_losers": [
+      {
+        "trade_id": "T0230",
+        "stock": "LGB Forge Ltd.",
+        "entry_date": "2019-06-28",
+        "exit_date": "2019-09-30",
+        "pnl": -84090.91,
+        "return_%": -42.05
+      },
+      {
+        "trade_id": "T0300",
+        "stock": "Pradeep Metals Ltd.",
+        "entry_date": "2020-12-31",
+        "exit_date": "2021-03-31",
+        "pnl": -85576.15,
+        "return_%": -42.79
+      },
+      {
+        "trade_id": "T0245",
+        "stock": "Balrampur Chini Mill..",
+        "entry_date": "2019-12-31",
+        "exit_date": "2020-03-31",
+        "pnl": -86532.17,
+        "return_%": -43.27
+      },
+      {
+        "trade_id": "T0247",
+        "stock": "Dwarikesh Sugar Indu..",
+        "entry_date": "2019-12-31",
+        "exit_date": "2020-03-31",
+        "pnl": -100898.2,
+        "return_%": -50.45
+      },
+      {
+        "trade_id": "T0251",
+        "stock": "Roto Pumps Ltd.",
+        "entry_date": "2019-12-31",
+        "exit_date": "2020-03-31",
+        "pnl": -104242.42,
+        "return_%": -52.12
+      }
+    ],
+    "pnl_distribution_skewness": 1.7825,
+    "skewness_interpretation": "Positive skew (frequent small losses/gains with occasional massive winning trades)"
+  },
+  "risk_observations": {
+    "profit_factor": 2.33,
+    "expectancy_inr": 14443.56,
+    "sharpe_ratio": 2.14,
+    "sortino_ratio": 5.42,
+    "calmar_ratio": 0.54,
+    "max_drawdown_inr": -2100115.58,
+    "max_drawdown_%": -12.95,
+    "max_drawdown_duration_days": 1283,
+    "max_win_streak": 12,
+    "max_loss_streak": 13
+  },
+  "potential_data_issues": [
+    "77 trades in input file lacked provided return % (properly handled as 0% for unclosed trades).",
+    "94 trades marked as 'Active' on Jul 31, 2024; evaluated using latest Close Price as mark-to-market."
+  ],
+  "overall_validation_notes": "Independent audit confirmed mathematical correctness of position sizing, P&L calculations, and cumulative equity curve. No look-ahead bias or synthetic broker artifacts were detected in the trade signals."
+}

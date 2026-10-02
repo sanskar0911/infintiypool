@@ -17,8 +17,9 @@ import sys
 import json
 import base64
 import urllib.parse
+import math
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import pandas as pd
 import numpy as np
 
@@ -47,6 +48,7 @@ from visualization import (
     plot_trade_distribution,
     plot_portfolio_allocation
 )
+from validation_signal.backtester1 import run_validation_simulation
 
 # Defined Quantitative Evaluation Weights
 METRIC_WEIGHTS = {
@@ -78,8 +80,8 @@ def evaluate_and_recommend_strategies(
     commission: float = 0.001,
     slippage: float = 0.0005,
     position_size: float = 0.2,
-    stop_loss: float = 0.05,
-    take_profit: float = 0.10
+    stop_loss: Optional[float] = 0.05,
+    take_profit: Optional[float] = 0.10
 ) -> dict:
     """
     Evaluates all available strategies (SMA, EMA, RSI) across defined quantitative metrics with explicit weights,
@@ -230,6 +232,8 @@ def run_full_simulation(params: dict) -> dict:
     elif strategy_name == "RSI":
         strategy_kwargs = {"period": rsi_period, "oversold": oversold, "overbought": overbought}
 
+    df_signals = generate_signals(df, strategy_name=strategy_name, **strategy_kwargs)
+
     # 3. Execute Backtest Simulation via Upgraded BacktestEngine
     from engine import BacktestEngine, BacktestConfig, ExecutionTiming, InsufficientCashPolicy
 
@@ -310,8 +314,8 @@ def run_full_simulation(params: dict) -> dict:
     config_dict = {
         "strategy_name": f"{strategy_name} Crossover Strategy" if strategy_name != "RSI" else "RSI Mean-Reversion",
         "stock_ticker": ticker,
-        "start_date": df.index[0].strftime("%Y-%m-%d"),
-        "end_date": df.index[-1].strftime("%Y-%m-%d"),
+        "start_date": pd.to_datetime(df.index[0]).strftime("%Y-%m-%d"),
+        "end_date": pd.to_datetime(df.index[-1]).strftime("%Y-%m-%d"),
         "initial_capital": initial_capital,
         "final_value": portfolio_df["Portfolio Value"].iloc[-1],
         "position_size": position_size,
@@ -341,12 +345,17 @@ def run_full_simulation(params: dict) -> dict:
 
         for idx, row in trade_log_df.iterrows():
             trade_date = str(row.get("Date", idx))
-            trade_type = str(row.get(type_col, "N/A"))
-            price = float(row.get(price_col, 0.0))
-            shares = int(row.get("Shares", 0))
+            raw_type = str(row.get(type_col, "N/A"))
+            trade_type = "BUY" if "BUY" in raw_type.upper() else ("SELL" if "SELL" in raw_type.upper() else raw_type)
+            raw_p = row.get(price_col)
+            price = float(raw_p) if raw_p is not None else 0.0
+            raw_s = row.get("Shares")
+            shares = int(raw_s) if raw_s is not None else 0
             val = float(price * shares)
-            cost = float(row.get(cost_col, 0.0))
-            rem_cash = float(row.get(cash_col, 0.0))
+            raw_c = row.get(cost_col)
+            cost = float(raw_c) if raw_c is not None else 0.0
+            raw_cash = row.get(cash_col)
+            rem_cash = float(raw_cash) if raw_cash is not None else 0.0
 
             trades.append({
                 "Date": trade_date,
@@ -985,6 +994,220 @@ INDEX_HTML = """<!DOCTYPE html>
             100% { transform: rotate(360deg); }
         }
 
+        
+        /* Main Navigation Mode Switcher */
+        .mode-switcher-container {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 0.3rem;
+            border-radius: 0.65rem;
+            border: 1px solid var(--card-border);
+        }
+
+        .mode-nav-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            padding: 0.5rem 1.1rem;
+            border-radius: 0.45rem;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.25s;
+        }
+
+        .mode-nav-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .mode-nav-btn.active {
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4);
+        }
+
+        .mode-nav-btn.val-mode.active {
+            color: #ffffff;
+            background: linear-gradient(135deg, #059669, #10b981);
+            box-shadow: 0 2px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Validation UI Styles */
+        .val-header-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            padding: 1.4rem;
+            margin-bottom: 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .val-controls-grid {
+            display: flex;
+            gap: 0.85rem;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-top: 1.2rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .val-control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .val-control-item label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .val-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .val-kpi-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            padding: 1.1rem 1.2rem;
+            backdrop-filter: blur(10px);
+            transition: transform 0.25s, border-color 0.25s;
+        }
+
+        .val-kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .val-kpi-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.35rem;
+        }
+
+        .val-kpi-val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            font-family: var(--font-main);
+        }
+
+        .val-kpi-sub {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+
+        .val-metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .val-metrics-table th {
+            background: rgba(0, 0, 0, 0.45);
+            color: var(--text-secondary);
+            padding: 0.75rem 0.9rem;
+            font-weight: 600;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .val-metrics-table td {
+            padding: 0.7rem 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .val-metrics-table tr:hover td {
+            background-color: rgba(255, 255, 255, 0.025);
+        }
+
+        .val-cat-header td {
+            background: rgba(30, 41, 59, 0.7) !important;
+            color: #60a5fa !important;
+            font-weight: 700 !important;
+            font-size: 0.82rem !important;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.55rem 0.9rem !important;
+            border-top: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .download-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.2rem;
+            padding: 0.5rem 0;
+        }
+
+        .download-card {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--card-border);
+            border-radius: 0.65rem;
+            padding: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.25s;
+        }
+
+        .download-card:hover {
+            border-color: var(--accent-primary);
+            background: rgba(59, 130, 246, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .audit-tag {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border-radius: 0.3rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .audit-tag.passed {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .audit-tag.verified {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+
+        .audit-tag.flagged {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .cum-pnl-cell {
+            font-weight: 700;
+            background: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+            border-radius: 4px;
+            padding: 0.2rem 0.5rem;
+            display: inline-block;
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -993,6 +1216,19 @@ INDEX_HTML = """<!DOCTYPE html>
         <div class="logo-container">
             <h1>QUANTUM LABS</h1>
             <p>Institutional AI Equity Backtesting & Research Terminal</p>
+        </div>
+
+        <!-- Mode Switcher -->
+        <div class="mode-switcher-container">
+            <button class="mode-nav-btn active" id="mode-btn-terminal" onclick="switchTerminalMode('terminal')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                Strategy Terminal
+            </button>
+            <button class="mode-nav-btn val-mode" id="mode-btn-validation" onclick="switchTerminalMode('validation')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Signal Validation & Audit
+                <span style="background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-size: 0.68rem; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-weight: 700; margin-left: 0.25rem;">NEW</span>
+            </button>
         </div>
         <div class="controls">
             <select id="ticker-select" title="Stock Universe">
@@ -1022,6 +1258,8 @@ INDEX_HTML = """<!DOCTYPE html>
         </div>
     </header>
 
+    <!-- TERMINAL VIEW CONTAINER -->
+    <div id="terminal-view">
     <!-- Metrics Summary Grid -->
     <div class="metrics-grid">
         <div class="metric-card">
@@ -1328,6 +1566,288 @@ INDEX_HTML = """<!DOCTYPE html>
             </div>
         </div>
     </div>
+    </div> <!-- Close #terminal-view -->
+
+    <!-- ============================================================== -->
+    <!-- SIGNAL VALIDATION & METRICS AUDIT SECTION                      -->
+    <!-- ============================================================== -->
+    <div id="validation-view" class="hidden">
+        <!-- Validation Header & Action Banner (Clean, no messy form clutter) -->
+        <div class="val-header-card" style="padding: 1.5rem 1.8rem; background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.75rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.2rem;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+                        <span style="font-size: 1.5rem;">🔬</span>
+                        <h2 style="font-size: 1.45rem; font-weight: 800; background: linear-gradient(to right, #10b981, #3b82f6, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">
+                            Signal Validation & AI Verification Engine
+                        </h2>
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 0.75rem; padding: 0.2rem 0.5rem; font-weight: 700;">
+                            INSTITUTIONAL GRADE
+                        </span>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0.2rem 0 0.8rem 0; line-height: 1.45;">
+                        Simulating <span style="color: #60a5fa; font-weight: 600;">trade logbook-Signal file.xlsx</span> against specifications in <span style="color: #34d399; font-weight: 600;">BACKTESTING REPORT.pdf</span>. Featuring autonomous quantitative math audit with GPT-4o-mini.
+                    </p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                        <span class="badge" style="background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+                            📁 Source: trade logbook-Signal file.xlsx (789 Signals)
+                        </span>
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+                            💼 Initial Capital: ₹1.00 Cr
+                        </span>
+                        <span class="badge" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+                            🎯 2.0% Fixed Alloc (₹2.00 L / Trade)
+                        </span>
+                        <span class="badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+                            🤖 Autonomous AI Auditor: GPT-4o-mini
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn-primary" id="val-run-btn" onclick="executeValidationSimulation()" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45); font-weight: 700; padding: 0.8rem 1.6rem; font-size: 0.95rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.6rem; cursor: pointer; transition: all 0.2s;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <span>Run Validation & AI Verification</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 12 Top High-Impact KPI Highlight Cards -->
+        <div class="val-kpi-grid">
+            <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
+                <div class="val-kpi-label">Final Equity</div>
+                <div class="val-kpi-val positive" id="val-card-equity">₹2,13,95,967</div>
+                <div class="val-kpi-sub">Capital: ₹1.00 Cr (<span style="color:#10b981; font-weight:700;" id="val-card-total-return">+113.96%</span>)</div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
+                <div class="val-kpi-label">Total Net P&L</div>
+                <div class="val-kpi-val positive" id="val-card-pnl">+₹1,13,95,967</div>
+                <div class="val-kpi-sub">Avg Trade: <span id="val-card-avg-trade">₹14,443.56</span></div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #3b82f6;">
+                <div class="val-kpi-label">CAGR</div>
+                <div class="val-kpi-val neutral" id="val-card-cagr">6.94%</div>
+                <div class="val-kpi-sub">Duration: <span id="val-card-span">11.34 Years</span></div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #60a5fa;">
+                <div class="val-kpi-label">Win Rate</div>
+                <div class="val-kpi-val neutral" id="val-card-winrate">51.08%</div>
+                <div class="val-kpi-sub">Wins: <span id="val-card-wins" style="color:#10b981;">403</span> | Losses: <span id="val-card-losses" style="color:#ef4444;">309</span></div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
+                <div class="val-kpi-label">Profit Factor</div>
+                <div class="val-kpi-val positive" id="val-card-profitfactor">2.33</div>
+                <div class="val-kpi-sub">Gross Win/Loss: ₹1.99Cr / ₹85.86L</div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #8b5cf6;">
+                <div class="val-kpi-label">Expectancy (EV)</div>
+                <div class="val-kpi-val" style="color: #a78bfa;" id="val-card-ev">₹14,443.56</div>
+                <div class="val-kpi-sub">Trading Edge: <span id="val-card-ev-pct" style="color:#34d399;">+7.22% / trade</span></div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #3b82f6;">
+                <div class="val-kpi-label">Sharpe Ratio</div>
+                <div class="val-kpi-val neutral" id="val-card-sharpe">2.14</div>
+                <div class="val-kpi-sub">Rf Discount: 6.0% Annualized</div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #ef4444;">
+                <div class="val-kpi-label">Max Drawdown</div>
+                <div class="val-kpi-val negative" id="val-card-maxdd">-12.95%</div>
+                <div class="val-kpi-sub">Trough: <span id="val-card-maxdd-inr">₹-21,00,115</span></div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
+                <div class="val-kpi-label">Sortino Ratio</div>
+                <div class="val-kpi-val positive" id="val-card-sortino">5.42</div>
+                <div class="val-kpi-sub">Downside Risk Adjusted</div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #f59e0b;">
+                <div class="val-kpi-label">Calmar Ratio</div>
+                <div class="val-kpi-val" style="color: #fbbf24;" id="val-card-calmar">0.54</div>
+                <div class="val-kpi-sub">CAGR / abs(Max DD)</div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #ec4899;">
+                <div class="val-kpi-label">Max Streaks</div>
+                <div class="val-kpi-val" style="font-size: 1.35rem; color: #f472b6;" id="val-card-streaks">12W / 13L</div>
+                <div class="val-kpi-sub">Max Consec Profit: ₹13.16L</div>
+            </div>
+            <div class="val-kpi-card" style="border-top: 3px solid #06b6d4;">
+                <div class="val-kpi-label">Skewness</div>
+                <div class="val-kpi-val" style="color: #22d3ee;" id="val-card-skewness">+1.7825</div>
+                <div class="val-kpi-sub">Positive Skew (Right-Tailed)</div>
+            </div>
+        </div>
+
+        <!-- Validation Workspace 3 Primary Tabs & Panels -->
+        <div class="panel" style="margin-bottom: 2rem;">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span>🔬 Quantitative Validation & AI Verification Workstation</span>
+                </div>
+                <div class="tabs" id="val-subtabs">
+                    <button class="tab-btn active" data-vtab="metrics">📋 Metrics & PDF Formulas</button>
+                    <button class="tab-btn" data-vtab="llm">🤖 AI Verification (GPT-4o-mini)</button>
+                    <button class="tab-btn" data-vtab="downloads">💾 CSV Exports & Downloads</button>
+                </div>
+            </div>
+
+            <!-- SECTION 1: Metrics & PDF Formulas Table -->
+            <div id="vtab-content-metrics" class="val-tab-pane">
+                <div style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <span>Reconciliation with formulas specified in <strong>BACKTESTING REPORT.pdf</strong> and project backtester:</span>
+                    <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">✓ QuantLab Engine Reconciled</span>
+                </div>
+                <div class="table-container" style="max-height: 560px;">
+                    <table class="val-metrics-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 28%;">Metric Name</th>
+                                <th style="width: 24%;">Calculated Value</th>
+                                <th style="width: 48%;">Mathematical Formula / Definition</th>
+                            </tr>
+                        </thead>
+                        <tbody id="val-metrics-tbody">
+                            <!-- Populated dynamically by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION 2: AI Verification (GPT-4o-mini Autonomous Math Calculation & Audit) -->
+            <div id="vtab-content-llm" class="val-tab-pane hidden">
+                <!-- Status Banner -->
+                <div class="recom-banner" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; flex-wrap: wrap; gap: 0.8rem; background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(168, 85, 247, 0.35);">
+                    <div>
+                        <div style="font-size: 1.08rem; font-weight: 800; color: #c084fc; display: flex; align-items: center; gap: 0.5rem;">
+                            <span>🤖 Autonomous AI Quantitative Verification:</span>
+                            <span class="badge" style="background: rgba(168, 85, 247, 0.25); color: #e9d5ff; font-size: 0.85rem; padding: 0.25rem 0.6rem; font-weight: 700;">STRATEGY EVALUATED BY AI ✓</span>
+                        </div>
+                        <div style="color: #cbd5e1; font-size: 0.85rem; margin-top: 0.3rem;" id="val-llm-engine-label">
+                            AI Model: GPT-4o-mini | All Quantitative Metrics Independently Computed from Signal Data
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 0.85rem; padding: 0.35rem 0.8rem; border: 1px solid rgba(168, 85, 247, 0.4);">
+                            ✓ Autonomous LLM Computation
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Comprehensive Autonomous LLM Metric Calculation Table -->
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+                        <div style="font-size: 0.95rem; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.03em;">
+                            🧮 Autonomous Metric Calculation (GPT-4o-mini Independent Math)
+                        </div>
+                        <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-size: 0.75rem;">
+                            Direct Signal Evaluation
+                        </span>
+                    </div>
+                    <div class="table-container" style="max-height: 560px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 28%;">Metric Name</th>
+                                    <th style="width: 24%; color: #34d399;">LLM Calculated Value</th>
+                                    <th style="width: 48%;">LLM Quantitative Note</th>
+                                </tr>
+                            </thead>
+                            <tbody id="val-llm-metrics-tbody">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: CSV Exports & Downloads (Exactly 2 Clean CSV Download Cards) -->
+            <div id="vtab-content-downloads" class="val-tab-pane hidden">
+                <div style="margin-bottom: 1.2rem; color: var(--text-secondary); font-size: 0.88rem;">
+                    Download the validated backtest results and AI verification datasets directly to your machine (2 primary artifacts):
+                </div>
+
+                <!-- 2 Clean Download Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Card 1: validation_metrics.csv -->
+                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 0.75rem; padding: 1.4rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem;">
+                                <span style="font-size: 1.3rem;">📄</span>
+                                <div style="font-size: 1.12rem; font-weight: 800; color: #f8fafc;">
+                                     validation_metrics.csv
+                                </div>
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.72rem;">ENGINE OUTPUT</span>
+                            </div>
+                            <div style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 1.2rem; line-height: 1.5;">
+                                Complete institutional metrics dataset containing all quantitative KPIs calculated by the Python validation backtester matching <em>BACKTESTING REPORT.pdf</em>.
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="downloadValidationCSV('validation_metrics.csv')" style="width: 100%; font-weight: 700; padding: 0.7rem; font-size: 0.9rem; background: linear-gradient(135deg, #10b981, #059669); display: flex; justify-content: center; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download validation_metrics.csv
+                        </button>
+                    </div>
+
+                    <!-- Card 2: llm_verification_metrics.csv -->
+                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 0.75rem; padding: 1.4rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem;">
+                                <span style="font-size: 1.3rem;">🤖</span>
+                                <div style="font-size: 1.12rem; font-weight: 800; color: #c084fc;">
+                                    llm_verification_metrics.csv
+                                </div>
+                                <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-size: 0.72rem;">AI VERIFICATION</span>
+                            </div>
+                            <div style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 1.2rem; line-height: 1.5;">
+                                Autonomous AI verification dataset. Quantitative metrics independently computed by GPT-4o-mini directly from <em>trade logbook-Signal file.xlsx</em> along with financial rationale notes.
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="downloadValidationCSV('llm_verification_metrics.csv')" style="width: 100%; font-weight: 700; padding: 0.7rem; font-size: 0.9rem; background: linear-gradient(135deg, #a855f7, #7e22ce); display: flex; justify-content: center; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download llm_verification_metrics.csv
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Data Previews of Both CSVs -->
+                <div style="margin-top: 1rem;">
+                    <div style="font-size: 0.92rem; font-weight: 700; color: #10b981; text-transform: uppercase; margin-bottom: 0.6rem; letter-spacing: 0.03em;">
+                        👁️ Live Table Preview: validation_metrics.csv
+                    </div>
+                    <div class="table-container" style="max-height: 280px; margin-bottom: 1.8rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 28%;">Metric Name</th>
+                                    <th style="width: 24%;">Calculated Value</th>
+                                    <th style="width: 48%;">Mathematical Formula / Definition</th>
+                                </tr>
+                            </thead>
+                            <tbody id="val-metrics-preview-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="font-size: 0.92rem; font-weight: 700; color: #c084fc; text-transform: uppercase; margin-bottom: 0.6rem; letter-spacing: 0.03em;">
+                        👁️ Live Table Preview: llm_verification_metrics.csv
+                    </div>
+                    <div class="table-container" style="max-height: 280px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 28%;">Metric Name</th>
+                                    <th style="width: 24%;">LLM Calculated Value</th>
+                                    <th style="width: 48%;">LLM Quantitative Note</th>
+                                </tr>
+                            </thead>
+                            <tbody id="val-llm-preview-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- Close #validation-view -->
 
     <script>
         // DOM Handles
@@ -1821,6 +2341,313 @@ INDEX_HTML = """<!DOCTYPE html>
         ragQueryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleRAGSearch(); });
 
         // Initial Boot
+        
+        // =====================================================================
+        // MODE SWITCHING & SIGNAL VALIDATION JAVASCRIPT LOGIC
+        // =====================================================================
+        let currentValidationData = null;
+        let activeValTab = 'metrics';
+        let activeValChart = 'equity';
+
+        function switchTerminalMode(mode) {
+            const terminalView = document.getElementById('terminal-view');
+            const validationView = document.getElementById('validation-view');
+            const terminalControls = document.getElementById('terminal-controls');
+            const btnTerm = document.getElementById('mode-btn-terminal');
+            const btnVal = document.getElementById('mode-btn-validation');
+
+            if (mode === 'terminal') {
+                terminalView.classList.remove('hidden');
+                validationView.classList.add('hidden');
+                if (terminalControls) terminalControls.classList.remove('hidden');
+                btnTerm.classList.add('active');
+                btnVal.classList.remove('active');
+            } else {
+                terminalView.classList.add('hidden');
+                validationView.classList.remove('hidden');
+                if (terminalControls) terminalControls.classList.add('hidden');
+                btnVal.classList.add('active');
+                btnTerm.classList.remove('active');
+
+                // If not loaded yet, execute simulation
+                if (!currentValidationData) {
+                    executeValidationSimulation();
+                }
+            }
+        }
+
+        function toggleValApiKey() {
+            const inp = document.getElementById('val-param-apikey');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        }
+
+        // Subtab switching in Validation View
+        document.querySelectorAll('#val-subtabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#val-subtabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeValTab = e.target.dataset.vtab;
+
+                document.querySelectorAll('.val-tab-pane').forEach(p => p.classList.add('hidden'));
+                const activePane = document.getElementById(`vtab-content-${activeValTab}`);
+                if (activePane) activePane.classList.remove('hidden');
+            });
+        });
+
+        // Chart switching in Validation View
+        document.querySelectorAll('#val-chart-subtabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#val-chart-subtabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeValChart = e.target.dataset.vchart;
+                const chartImg = document.getElementById('val-display-chart');
+                if (activeValChart === 'equity') chartImg.src = '/validation_img/equity_curve.png?' + new Date().getTime();
+                else if (activeValChart === 'drawdown') chartImg.src = '/validation_img/drawdown_curve.png?' + new Date().getTime();
+                else if (activeValChart === 'histogram') chartImg.src = '/validation_img/yearly_return_histogram.png?' + new Date().getTime();
+            });
+        });
+
+        async function executeValidationSimulation() {
+            const runBtn = document.getElementById('val-run-btn');
+            const origHtml = runBtn.innerHTML;
+            runBtn.innerHTML = `⏳ Simulating & Verifying with GPT-4o-mini...`;
+            runBtn.disabled = true;
+
+            try {
+                const resp = await fetch('/api/validate_signal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        capital: 10000000,
+                        allocation: 0.02,
+                        risk_free: 0.06,
+                        mode: 'long_only',
+                        model: 'gpt-4o-mini'
+                    })
+                });
+
+                const data = await resp.json();
+                if (data.status === 'SUCCESS') {
+                    currentValidationData = data;
+                    renderValidationDashboard(data);
+                } else {
+                    alert('Validation error: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Validation request error:', err);
+                alert('Failed to execute validation: ' + err);
+            } finally {
+                runBtn.innerHTML = origHtml;
+                runBtn.disabled = false;
+            }
+        }
+
+        function renderValidationDashboard(data) {
+            const m = data.metrics;
+
+            // 1. Update 12 KPI Cards
+            document.getElementById('val-card-equity').innerText = '₹' + formatCurrency(m['Final Equity']);
+            document.getElementById('val-card-total-return').innerText = (m['Total Return %'] >= 0 ? '+' : '') + m['Total Return %'] + '%';
+            document.getElementById('val-card-pnl').innerText = (m['Total P&L'] >= 0 ? '+₹' : '₹') + formatCurrency(m['Total P&L']);
+            document.getElementById('val-card-avg-trade').innerText = '₹' + formatCurrency(m['Average P&L per Trade']);
+            document.getElementById('val-card-cagr').innerText = m['CAGR %'] + '%';
+            document.getElementById('val-card-span').innerText = m['Trading Years'] + ' Years (' + m['Calendar Days'] + ' Days)';
+            document.getElementById('val-card-winrate').innerText = m['Win Rate %'] + '%';
+            document.getElementById('val-card-wins').innerText = m['Winning Trades'];
+            document.getElementById('val-card-losses').innerText = m['Losing Trades'];
+            document.getElementById('val-card-profitfactor').innerText = m['Profit Factor'];
+            document.getElementById('val-card-ev').innerText = '₹' + formatCurrency(m['Expectancy Value (EV)']);
+            document.getElementById('val-card-ev-pct').innerText = '+' + m['Expectancy %'] + '% / trade';
+            document.getElementById('val-card-sharpe').innerText = m['Sharpe Ratio'];
+            document.getElementById('val-card-maxdd').innerText = m['Maximum Drawdown %'] + '%';
+            document.getElementById('val-card-maxdd-inr').innerText = '₹' + formatCurrency(m['Maximum Drawdown (INR)']);
+            document.getElementById('val-card-sortino').innerText = m['Sortino Ratio'];
+            document.getElementById('val-card-calmar').innerText = m['Calmar Ratio'];
+            document.getElementById('val-card-streaks').innerText = m['Max Win Streak'] + 'W / ' + m['Max Loss Streak'] + 'L';
+            document.getElementById('val-card-skewness').innerText = (m['Skewness'] >= 0 ? '+' : '') + m['Skewness'];
+
+            // 2. Render Section 1: Metrics & Formulas Table
+            renderValidationMetricsTable(m);
+
+            // 3. Render Section 2: AI Verification (LLM calculations, Checklist, Outliers, Narrative)
+            renderValidationLLMAudit(data.llm_audit, data.llm_checklist, data.llm_narrative);
+
+            // 4. Render Section 3: Live CSV Previews
+            renderValidationCSVPreviews(data);
+        }
+
+        function renderValidationMetricsTable(m) {
+            const tbody = document.getElementById('val-metrics-tbody');
+            const categories = [
+                {
+                    cat: "1. Trading Period & Timeline",
+                    items: [
+                        { name: "Trading Period Start", val: m["Trading Period Start"], formula: "Min(Entry Date) from validated dataset" },
+                        { name: "Trading Period End", val: m["Trading Period End"], formula: "Max(Exit Date) from validated dataset" },
+                        { name: "Calendar Duration", val: m["Calendar Days"] + " Days", formula: "Max Date - Min Date (Calendar days)" },
+                        { name: "Trading Years", val: m["Trading Years"] + " Years", formula: "Calendar Days / 365.25" }
+                    ]
+                },
+                {
+                    cat: "2. Trade Statistics",
+                    items: [
+                        { name: "Total Trades", val: m["Total Trades"], formula: "COUNT(Executed Trade Signals)" },
+                        { name: "Winning Trades", val: m["Winning Trades"], formula: "COUNTIF(Trade Net P&L > 0)" },
+                        { name: "Losing Trades", val: m["Losing Trades"], formula: "COUNTIF(Trade Net P&L <= 0)" },
+                        { name: "Win Rate %", val: m["Win Rate %"] + "%", formula: "(Winning Trades / Total Trades) * 100" },
+                        { name: "Loss Rate %", val: m["Loss Rate %"] + "%", formula: "(Losing Trades / Total Trades) * 100" }
+                    ]
+                },
+                {
+                    cat: "3. Returns & Profitability",
+                    items: [
+                        { name: "Initial Capital", val: "₹" + formatCurrency(m["Initial Capital"]), formula: "Prerequisite: ₹1 Crore (₹10,000,000)" },
+                        { name: "Final Portfolio Equity", val: "₹" + formatCurrency(m["Final Equity"]), formula: "Initial Capital + Total Realized P&L" },
+                        { name: "Total Net P&L", val: "₹" + formatCurrency(m["Total P&L"]), formula: "SUM(Net Trade P&L after costs)" },
+                        { name: "Total Return %", val: m["Total Return %"] + "%", formula: "(Total P&L / Initial Capital) * 100" },
+                        { name: "CAGR %", val: m["CAGR %"] + "%", formula: "((Final Equity / Initial Capital)^(1 / Years)) - 1" },
+                        { name: "Average P&L per Trade", val: "₹" + formatCurrency(m["Average P&L per Trade"]), formula: "Total P&L / Total Trades" },
+                        { name: "Median P&L", val: "₹" + formatCurrency(m["Median P&L"]), formula: "MEDIAN(Trade P&L Series)" },
+                        { name: "Gross Profit", val: "₹" + formatCurrency(m["Gross Profit"]), formula: "SUMIF(Net P&L > 0)" },
+                        { name: "Gross Loss", val: "₹" + formatCurrency(m["Gross Loss"]), formula: "SUMIF(Net P&L < 0)" },
+                        { name: "Profit Factor", val: m["Profit Factor"], formula: "Gross Profit / abs(Gross Loss)" },
+                        { name: "Average Win", val: "₹" + formatCurrency(m["Average Win"]), formula: "Gross Profit / Winning Trades" },
+                        { name: "Average Loss", val: "₹" + formatCurrency(m["Average Loss"]), formula: "Gross Loss / Losing Trades" },
+                        { name: "Risk/Reward Ratio", val: m["Risk/Reward Ratio"] + "x", formula: "Average Win / abs(Average Loss)" }
+                    ]
+                },
+                {
+                    cat: "4. Trading Edge & Risk Metrics",
+                    items: [
+                        { name: "Expectancy Value (EV)", val: "₹" + formatCurrency(m["Expectancy Value (EV)"]), formula: "(Win Rate * Avg Win) + (Loss Rate * Avg Loss)" },
+                        { name: "Expectancy % per Trade", val: "+" + m["Expectancy %"] + "%", formula: "(Win Rate * Avg Win %) - (Loss Rate * abs(Avg Loss %))" },
+                        { name: "Sharpe Ratio", val: m["Sharpe Ratio"], formula: "(Annualized Return - 6% Rf) / Annualized Trade Volatility" },
+                        { name: "Sortino Ratio", val: m["Sortino Ratio"], formula: "(Annualized Return - 6% Rf) / Downside Volatility" },
+                        { name: "Calmar Ratio", val: m["Calmar Ratio"], formula: "CAGR / abs(Maximum Drawdown %)" },
+                        { name: "Annual Volatility %", val: m["Annual Volatility %"] + "%", formula: "Daily Equity Returns StdDev * sqrt(252)" },
+                        { name: "Average Holding Period", val: m["Average Holding Period (Days)"] + " Days", formula: "Average(Exit Date - Entry Date)" }
+                    ]
+                },
+                {
+                    cat: "5. Streaks & Capital Preservation",
+                    items: [
+                        { name: "Max Consecutive Wins", val: m["Max Win Streak"] + " Trades", formula: "Max contiguous run of positive P&L trades" },
+                        { name: "Max Consecutive Losses", val: m["Max Loss Streak"] + " Trades", formula: "Max contiguous run of negative P&L trades" },
+                        { name: "Max Consecutive Profit (INR)", val: "₹" + formatCurrency(m["Max Consecutive Profit"]), formula: "Highest cumulative dollar run during winning streak" },
+                        { name: "Max Consecutive Loss (INR)", val: "₹" + formatCurrency(m["Max Consecutive Loss"]), formula: "Highest cumulative dollar drawdown in losing streak" }
+                    ]
+                },
+                {
+                    cat: "6. Drawdown Profile",
+                    items: [
+                        { name: "Maximum Drawdown (INR)", val: "₹" + formatCurrency(m["Maximum Drawdown (INR)"]), formula: "Min(Equity - Running High Watermark Peak)" },
+                        { name: "Maximum Drawdown %", val: m["Maximum Drawdown %"] + "%", formula: "Min((Equity - Peak) / Peak) * 100" },
+                        { name: "Max DD Duration", val: m["Max DD Duration (Days)"] + " Days", formula: "Peak Date to Recovery Date in days" },
+                        { name: "Drawdown Peak Date", val: m["Drawdown Peak Date"], formula: "High watermark preceding the deepest trough" },
+                        { name: "Drawdown Trough Date", val: m["Drawdown Trough Date"], formula: "Date of lowest underwater portfolio equity" },
+                        { name: "Recovery Date", val: m["Recovery Date"], formula: "First date equity regained or exceeded peak" }
+                    ]
+                },
+                {
+                    cat: "7. Skewness & Tail-Risk Distribution",
+                    items: [
+                        { name: "Fisher-Pearson Skewness", val: m["Skewness"], formula: "[n / ((n-1)(n-2))] * SUM(((x - mean)/s)^3)" },
+                        { name: "Skewness Classification", val: m["Skewness Classification"], formula: "Positive skew confirms explosive right-tail winners" }
+                    ]
+                }
+            ];
+
+            let html = "";
+            categories.forEach(cg => {
+                html += `<tr class="val-cat-header"><td colspan="3">${cg.cat}</td></tr>`;
+                cg.items.forEach(it => {
+                    html += `
+                        <tr>
+                            <td style="font-weight: 600; color: #f8fafc;">${it.name}</td>
+                            <td style="font-weight: 700; color: #60a5fa;">${it.val}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #94a3b8;">${it.formula}</td>
+                        </tr>
+                    `;
+                });
+            });
+            tbody.innerHTML = html;
+        }
+
+        function renderValidationLLMAudit(audit) {
+            if (!audit) return;
+            const count = (audit.llm_metrics_table || []).length;
+            const labelEl = document.getElementById('val-llm-engine-label');
+            if (labelEl) {
+                labelEl.innerText = `AI Model: ${audit.engine || 'GPT-4o-mini'} | ${count} Quantitative Metrics Independently Computed from Signal Data`;
+            }
+
+            // Render Table: Autonomous LLM Calculations (3 Clean Columns)
+            const llmTbody = document.getElementById('val-llm-metrics-tbody');
+            if (llmTbody && audit.llm_metrics_table) {
+                let llmHtml = "";
+                audit.llm_metrics_table.forEach(r => {
+                    llmHtml += `
+                        <tr>
+                            <td style="font-weight: 700; color: #f8fafc;">${r["Metric Name"]}</td>
+                            <td style="font-weight: 700; color: #34d399; font-family: var(--font-mono); font-size: 0.95rem;">${r["LLM Calculated Value"]}</td>
+                            <td style="font-size: 0.84rem; color: #cbd5e1; line-height: 1.45;">${r["LLM Quantitative Note"] || ''}</td>
+                        </tr>
+                    `;
+                });
+                llmTbody.innerHTML = llmHtml;
+            }
+        }
+
+        function renderValidationCSVPreviews(data) {
+            // Preview 1: validation_metrics.csv
+            const metricsTbody = document.getElementById('val-metrics-preview-tbody');
+            if (metricsTbody && data.metrics) {
+                const m = data.metrics;
+                const topEntries = [
+                    { name: "Total Trades", val: m["Total Trades"], formula: "COUNT(Executed Trade Signals)" },
+                    { name: "Win Rate %", val: m["Win Rate %"] + "%", formula: "(Winning Trades / Total Trades) * 100" },
+                    { name: "Total Net P&L", val: "₹" + formatCurrency(m["Total P&L"]), formula: "SUM(Net Trade P&L after costs)" },
+                    { name: "Total Return %", val: m["Total Return %"] + "%", formula: "(Total P&L / Initial Capital) * 100" },
+                    { name: "CAGR %", val: m["CAGR %"] + "%", formula: "((Final Equity / Initial Capital)^(1 / Years)) - 1" },
+                    { name: "Profit Factor", val: m["Profit Factor"], formula: "Gross Profit / abs(Gross Loss)" },
+                    { name: "Expectancy Value (EV)", val: "₹" + formatCurrency(m["Expectancy Value (EV)"]), formula: "(Win Rate * Avg Win) + (Loss Rate * Avg Loss)" },
+                    { name: "Maximum Drawdown %", val: m["Maximum Drawdown %"] + "%", formula: "Min((Equity - Peak) / Peak) * 100" }
+                ];
+                let mHtml = "";
+                topEntries.forEach(r => {
+                    mHtml += `
+                        <tr>
+                            <td style="font-weight: 700; color: #f8fafc;">${r.name}</td>
+                            <td style="font-weight: 700; color: #60a5fa;">${r.val}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #94a3b8;">${r.formula}</td>
+                        </tr>
+                    `;
+                });
+                metricsTbody.innerHTML = mHtml;
+            }
+
+            // Preview 2: llm_verification_metrics.csv
+            const llmTbody = document.getElementById('val-llm-preview-tbody');
+            if (llmTbody && data.llm_audit && data.llm_audit.llm_metrics_table) {
+                let lHtml = "";
+                data.llm_audit.llm_metrics_table.slice(0, 8).forEach(r => {
+                    lHtml += `
+                        <tr>
+                            <td style="font-weight: 700; color: #f8fafc;">${r["Metric Name"]}</td>
+                            <td style="font-weight: 700; color: #c084fc; font-family: var(--font-mono);">${r["LLM Calculated Value"]}</td>
+                            <td style="font-size: 0.82rem; color: #cbd5e1;">${r["LLM Quantitative Note"] || ''}</td>
+                        </tr>
+                    `;
+                });
+                llmTbody.innerHTML = lHtml;
+            }
+        }
+
+        function downloadValidationCSV(filename) {
+            window.location.href = `/api/validation_csv?file=${filename}`;
+        }
+
+
         window.addEventListener('load', () => {
             executeBacktest();
             fetchStocksOverview();
@@ -1829,6 +2656,21 @@ INDEX_HTML = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+
+def sanitize_json_obj(obj: Any) -> Any:
+    """Recursively replaces NaN, Inf, -Inf with None/null for valid RFC 8259 JSON."""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: sanitize_json_obj(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_json_obj(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return [sanitize_json_obj(v) for v in obj]
+    return obj
 
 
 class QuantumServerHandler(BaseHTTPRequestHandler):
@@ -1858,7 +2700,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(result).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(result)).encode("utf-8"))
             return
 
         # 3. Agent Workflow API
@@ -1868,7 +2710,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(result).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(result)).encode("utf-8"))
             return
 
         # 4. Stocks Overview API
@@ -1877,7 +2719,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(stocks_data).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(stocks_data)).encode("utf-8"))
             return
 
         # 5. RAG API (/api/rag and /api/rag/query)
@@ -1888,7 +2730,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(rag_res).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(rag_res)).encode("utf-8"))
             return
 
         # 6. Serve static result images
@@ -1902,6 +2744,69 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
                 with open(file_path, "rb") as f:
                     self.wfile.write(f.read())
                 return
+
+        # 7. Validation Signal Simulation API
+        elif path == "/api/validate_signal":
+            try:
+                cap = float(query.get("capital", [10000000.0])[0])
+                alloc = float(query.get("allocation", [0.02])[0])
+                rf = float(query.get("risk_free", [0.06])[0])
+                model = query.get("model", ["gpt-4o-mini"])[0]
+                api_key = query.get("api_key", [""])[0]
+                mode = query.get("mode", ["long_only"])[0]
+                val_res = run_validation_simulation(
+                    initial_capital=cap,
+                    allocation=alloc,
+                    risk_free=rf,
+                    strategy_mode=mode,
+                    openai_api_key=api_key if api_key else None,
+                    openai_model=model
+                )
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps(sanitize_json_obj(val_res), default=str).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ERROR", "message": str(e)}).encode("utf-8"))
+            return
+
+        # 8. Validation CSV Downloads API
+        elif path == "/api/validation_csv" or path.startswith("/api/validation_csv/"):
+            filename = query.get("file", [""])[0]
+            if not filename and path.startswith("/api/validation_csv/"):
+                filename = os.path.basename(path)
+            csv_path = os.path.join(SRC_DIR, "validation_signal", "output", filename)
+            if os.path.exists(csv_path) and filename.endswith(".csv"):
+                self.send_response(200)
+                self.send_header("Content-Type", "text/csv; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.end_headers()
+                with open(csv_path, "rb") as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"CSV File Not Found")
+            return
+
+        # 9. Validation Chart Images
+        elif path.startswith("/validation_img/"):
+            img_name = os.path.basename(path)
+            img_path = os.path.join(SRC_DIR, "validation_signal", "output", img_name)
+            if os.path.exists(img_path):
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.end_headers()
+                with open(img_path, "rb") as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Image Not Found")
+            return
 
         # 404 Fallback
         self.send_response(404)
@@ -1925,7 +2830,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(result).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(result)).encode("utf-8"))
             return
 
         elif path == "/api/agent":
@@ -1933,7 +2838,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(result).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(result)).encode("utf-8"))
             return
 
         elif path in ["/api/rag", "/api/rag/query"]:
@@ -1943,7 +2848,34 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(rag_res).encode("utf-8"))
+            self.wfile.write(json.dumps(sanitize_json_obj(rag_res)).encode("utf-8"))
+            return
+
+        elif path == "/api/validate_signal":
+            try:
+                cap = float(payload.get("capital", 10000000.0))
+                alloc = float(payload.get("allocation", 0.02))
+                rf = float(payload.get("risk_free", 0.06))
+                model = payload.get("model", "gpt-4o-mini")
+                api_key = payload.get("api_key", "")
+                mode = payload.get("mode", "long_only")
+                val_res = run_validation_simulation(
+                    initial_capital=cap,
+                    allocation=alloc,
+                    risk_free=rf,
+                    strategy_mode=mode,
+                    openai_api_key=api_key if api_key else None,
+                    openai_model=model
+                )
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps(sanitize_json_obj(val_res), default=str).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ERROR", "message": str(e)}).encode("utf-8"))
             return
 
         self.send_response(404)

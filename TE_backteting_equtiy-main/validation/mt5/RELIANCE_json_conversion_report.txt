@@ -1,0 +1,35 @@
+CSV → JSON CONVERSION REPORT
+============================
+
+Input:
+validation/mt5/RELIANCE_MT5.csv
+
+Output:
+validation/mt5/RELIANCE_MT5.json
+
+Symbol:
+QUANTLAB_RELIANCE
+
+Timeframe:
+D1
+
+Input records:
+1238
+
+JSON records:
+1238
+
+First datetime:
+2020.01.01 00:00:00
+
+Last datetime:
+2024.12.31 00:00:00
+
+Invalid records:
+0
+
+Duplicate timestamps:
+0
+
+Conversion status:
+SUCCESS

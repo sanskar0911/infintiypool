@@ -9,7 +9,7 @@ Stock Ticker / Universe: INFY
 Hypothesis            : Quantitative momentum / trend following strategy
 Date Range            : 2020-01-01 to 2024-12-31
 Initial Capital        : INR 100,000.00
-Final Portfolio Value  : INR 102,561.60
+Final Portfolio Value  : INR 97,862.32
 
 2. EXECUTION & PORTFOLIO RULES
 --------------------------------------------------------------------------------
@@ -22,28 +22,28 @@ Stop Loss / Take Profit: SL 5.0% | TP 10.0%
 
 3. PERFORMANCE & RETURN METRICS
 --------------------------------------------------------------------------------
-Total Return          : 2.56%
-CAGR (Compound Ann)   : 0.51%
-Annualized Volatility : 2.13%
-Sharpe Ratio (Rf=0)   : 0.2527
-Sortino Ratio (Rf=0)  : 0.1833
-Maximum Drawdown (MDD): -4.04%
+Total Return          : -2.14%
+CAGR (Compound Ann)   : -0.43%
+Annualized Volatility : 5.02%
+Sharpe Ratio (Rf=0)   : -0.0625
+Sortino Ratio (Rf=0)  : -0.0243
+Maximum Drawdown (MDD): -4.42%
 
 4. TRADING & EXPOSURE STATISTICS
 --------------------------------------------------------------------------------
-Total Executed Trades : 10
-Trade Win Rate        : 40.00%
-Annual Portfolio Turnover: 40.77%
-Market Time Exposure  : 19.87%
+Total Executed Trades : 11
+Trade Win Rate        : 45.45%
+Annual Portfolio Turnover: 47.20%
+Market Time Exposure  : 0.89%
 
 5. BENCHMARK COMPARISON (NIFTY50)
 --------------------------------------------------------------------------------
-Strategy CAGR vs Benchmark: 0.51% vs 16.10%
-Excess Annual Return   : -15.59%
-Strategy Sharpe vs Bench  : 0.25 vs 0.84
-Portfolio Beta        : 0.03
-Correlation with Bench: 0.29
-Information Ratio     : -0.78
+Strategy CAGR vs Benchmark: -0.43% vs 16.10%
+Excess Annual Return   : -16.53%
+Strategy Sharpe vs Bench  : -0.06 vs 0.84
+Portfolio Beta        : -0.01
+Correlation with Bench: -0.04
+Information Ratio     : -0.77
 
 6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS
 --------------------------------------------------------------------------------

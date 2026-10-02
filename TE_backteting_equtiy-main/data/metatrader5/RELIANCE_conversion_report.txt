@@ -1,0 +1,38 @@
+MT5 CSV CONVERSION REPORT
+==========================
+
+Input:
+data/processed/RELIANCE.csv
+
+Output:
+data/metatrader5/RELIANCE.csv
+
+Input rows: 1238
+Output rows: 1238
+
+First date:
+2020-01-01
+
+Last date:
+2024-12-31
+
+Number of duplicates: 0
+Number of invalid rows: 0
+Number of missing OHLC values: 0
+Number of negative prices: 0
+Number of negative volume values: 0
+
+Tick volume mode:
+constant
+
+Tick volume:
+1
+
+Spread:
+0
+
+Invalid rows:
+0
+
+Conversion status:
+SUCCESS

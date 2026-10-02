@@ -182,8 +182,9 @@ def plot_trade_distribution(trade_log_df: pd.DataFrame, output_path: str) -> Non
     trade_returns = []
     if not trade_log_df.empty:
         type_col = "BUY/SELL" if "BUY/SELL" in trade_log_df.columns else "Type"
-        buys = trade_log_df[trade_log_df[type_col] == "BUY"]
-        sells = trade_log_df[trade_log_df[type_col] == "SELL"]
+        type_str = trade_log_df[type_col].astype(str).str.upper()
+        buys = trade_log_df[type_str.str.contains("BUY")]
+        sells = trade_log_df[type_str.str.contains("SELL")]
         n_trades = min(len(buys), len(sells))
         
         for i in range(n_trades):
