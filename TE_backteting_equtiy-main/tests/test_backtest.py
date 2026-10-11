@@ -15,12 +15,12 @@ SRC_DIR = os.path.join(BASE_DIR, "src")
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
+    sys.path.append(SRC_DIR)
 
-from src.strategy import generate_signals
-from src.backtester import run_backtest
-from src.metrics import calculate_metrics
-from src.benchmark import compare_strategy_vs_benchmark, load_benchmark_data
+from strategy import generate_signals
+from backtester import run_backtest
+from metrics import calculate_metrics
+from benchmark import compare_strategy_vs_benchmark, load_benchmark_data
 
 
 @pytest.fixture

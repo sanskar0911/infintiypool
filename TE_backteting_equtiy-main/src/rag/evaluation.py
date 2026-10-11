@@ -5,7 +5,7 @@ Empirical RAG Retrieval Evaluation module computing Top-1 and Top-3 accuracy.
 """
 
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from rag.retriever import RAGRetriever
 
 
@@ -46,7 +46,7 @@ EVALUATION_DATASET: List[Dict[str, Any]] = [
 ]
 
 
-def evaluate_rag_retrieval(retriever: RAGRetriever = None) -> Dict[str, Any]:
+def evaluate_rag_retrieval(retriever: Optional[RAGRetriever] = None) -> Dict[str, Any]:
     """
     Run empirical retrieval accuracy evaluation across the test dataset.
 

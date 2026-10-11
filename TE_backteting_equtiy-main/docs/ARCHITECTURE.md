@@ -15,29 +15,21 @@ It enforces strict modular separation across data ingestion, signal generation, 
 
 ## 2. Core Architectural Layers
 
-```
-                               ┌───────────────────────────┐
-                               │     Streamlit UI App      │
-                               └─────────────┬─────────────┘
-                                             │
-                               ┌─────────────▼─────────────┐
-                               │  LangGraph Agent Workflow │
-                               │    (Loop Engineering)     │
-                               └─────────────┬─────────────┘
-                                             │
-      ┌────────────────────────┬─────────────┴─────────────┬────────────────────────┐
-      │                        │                           │                        │
-┌─────▼──────────┐   ┌─────────▼─────────┐       ┌─────────▼─────────┐    ┌─────────▼─────────┐
-│ Data Loader &  │   │ Strategy Engine & │       │ Execution Layer   │    │  Metrics &        │
-│ Data Cleaner   │   │ Factory Pattern   │       │ & Portfolio Rules │    │  Benchmark Engine │
-└─────┬──────────┘   └─────────┬─────────┘       └─────────┬─────────┘    └─────────┬─────────┘
-      │                        │                           │                        │
-      └────────────────────────┴─────────────┬─────────────┴────────────────────────┘
-                                             │
-                               ┌─────────────▼─────────────┐
-                               │ Experiment Suite & Audit  │
-                               │ (Walk-Forward, OOS, Rob)  │
-                               └───────────────────────────┘
+```mermaid
+flowchart TD
+    UI["Streamlit Interactive UI App (src/app.py)"] --> Agent["LangGraph Agent Workflow (src/agent/)"]
+
+    Agent --> DataLoader["Data Ingestion & Cleaning Layer (data_loader.py, clean_data.py)"]
+    Agent --> StratEngine["Strategy Engine & Factory (strategy.py, strategies/)"]
+    Agent --> ExecLayer["Execution Engine & Costs (engine/, backtester.py)"]
+    Agent --> MetricsEngine["Metrics & Benchmark Engine (metrics.py, benchmark.py)"]
+
+    DataLoader --> ExpSuite["Experiment Suite & Audit (Walk-Forward, OOS, Robustness)"]
+    StratEngine --> ExpSuite
+    ExecLayer --> ExpSuite
+    MetricsEngine --> ExpSuite
+
+    ExpSuite --> ReportGen["Master Report Engine & Fact Sheets (quantlab, report.py)"]
 ```
 
 ### 1. Data Ingestion & Data Hygiene Layer

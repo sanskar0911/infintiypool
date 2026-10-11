@@ -1,28 +1,28 @@
 Metric Name,LLM Calculated Value,LLM Quantitative Note
-Total Trades,789,Computed across all 789 signal rows parsed from signal spreadsheet.
-Winning Trades,403,Identified 403 profitable trades out of 789 total signals.
-Losing Trades,386,Identified 386 loss-taking exits with disciplined risk control.
-Win Rate %,51.08%,Calculated as winning trade count divided by total signal executions.
-Loss Rate %,48.92%,Complement of Win Rate: binary trade outcome partitioning.
-Initial Capital,"₹10,000,000.00",Institutional base starting equity allocation.
-Final Portfolio Equity,"₹21,395,967.15",Terminal capital balance after accumulating all trade profits.
-Total Net Profit (INR),"₹11,395,967.15",Sum of net trade profits across all executed positions.
-Total Return %,113.96%,Cumulative percentage portfolio return over the backtest horizon.
-CAGR %,6.94%,Compound Annual Growth Rate annualized over calendar duration.
-Profit Factor,2.33,Gross gains relative to gross losses.
-Average Win (INR),"₹49,582.55",Average profit per winning momentum trade.
-Average Loss (INR),"₹-22,243.00",Average downside per losing trade.
-Risk / Reward Ratio,2.23x,Ratio of average win magnitude to average loss magnitude.
-Expectancy Value (EV),"₹14,445.49",Expected monetary profit generated per executed trade signal.
-Sharpe Ratio,2.14,Risk-adjusted return with 6.0% risk-free rate.
-Sortino Ratio,5.42,Downside risk-adjusted return penalizing negative variance.
-Calmar Ratio,0.54,Annualized return divided by maximum drawdown percentage.
-Maximum Drawdown %,-12.95%,Deepest peak-to-trough equity percentage decline.
-Maximum Drawdown (INR),"₹-2,100,115.58",Largest monetary drawdown from running high watermark.
-Max Drawdown Duration,1283 Days,Calendar duration from drawdown peak to full equity recovery.
-Annual Volatility %,7.62%,Annualized portfolio equity volatility.
-Hit Ratio %,0.7%,Percentage of calendar days closing with positive P&L.
-Average Holding Period,78.9 Days,Average position duration in calendar days.
-Max Consecutive Win Streak,12 Wins,Longest uninterrupted sequence of winning trades.
-Max Consecutive Loss Streak,13 Losses,Longest uninterrupted sequence of loss-taking trades.
-Fisher-Pearson Skewness,1.7825,Sample-adjusted 3rd standardized moment of returns.
+Total Trades,125,Total count of closed trade signals recorded across 85 unique tickers between 2013-03-28 and 2024-07-31.
+Winning Trades,58,Trades closing with positive realized P&L (gross profit component).
+Losing Trades,67,Trades closing with negative realized P&L (gross loss component).
+Win Rate %,46.40%,Calculated as (Winning Trades / Total Trades) * 100 = (58 / 125) * 100.
+Loss Rate %,53.60%,Calculated as (Losing Trades / Total Trades) * 100 = (67 / 125) * 100.
+Initial Capital,"₹10,000,000.00",Starting portfolio cash allocation baseline (₹1.00 Crore).
+Final Portfolio Equity,"₹10,903,733.11","Initial Capital + Net Total Realized P&L (₹10,000,000.00 + ₹903,733.11)."
+Total Net Profit (INR),"₹903,733.11","Sum of Gross Profit (₹2,105,540.59) and Gross Loss (-₹1,201,807.48)."
+Total Return %,9.04%,"Calculated as (Net Realized P&L / Initial Capital) * 100 = (₹903,733.11 / ₹10,000,000.00) * 100."
+CAGR %,0.77%,"Compound Annual Growth Rate over 11.34 years (4,143 days): (10,903,733.11 / 10,000,000)^(1 / 11.343) - 1."
+Profit Factor,1.75,"Gross Profit / |Gross Loss| = ₹2,105,540.59 / ₹1,201,807.48 = 1.752."
+Average Win (INR),"₹36,302.42","Gross Profit / Winning Trades = ₹2,105,540.59 / 58."
+Average Loss (INR),"₹17,937.43","|Gross Loss| / Losing Trades = ₹1,201,807.48 / 67."
+Risk / Reward Ratio,2.02 : 1,"Average Win / Average Loss = ₹36,302.42 / ₹17,937.43 = 2.024."
+Expectancy Value (EV),"₹7,229.86","(Win Rate * Avg Win) - (Loss Rate * Avg Loss) = Net Realized P&L / 125 = +3.61% per ₹200,000 trade allocation."
+Sharpe Ratio,0.89,Annualized zero-benchmark Sharpe: (Mean Trade Return / Trade Std Dev) * sqrt(Annual Trade Frequency ~ 11.02 trades/yr).
+Sortino Ratio,1.83,"Annualized Sortino evaluated using trade downside semi-deviation (σ_downside ≈ ₹13,132.33)."
+Calmar Ratio,0.26,CAGR / |Max Drawdown %| = 0.77% / 2.91% = 0.265.
+Maximum Drawdown %,-2.91%,Peak-to-trough maximum equity retracement observed during the backtest window.
+Maximum Drawdown (INR),"-₹301,816.69",Peak-to-trough nominal drawdown in Indian Rupees.
+Max Drawdown Duration,487 Days,Longest elapsed calendar period between a portfolio peak equity level and subsequent high-water mark recovery.
+Annual Volatility %,0.90%,"Annualized portfolio equity standard deviation, heavily dampened by ~98% average unallocated cash."
+Hit Ratio %,46.40%,Identical to Win Rate: percentage of trades producing strictly positive returns.
+Average Holding Period,24.6 Trading Days,Mean duration between signal entry timestamp and exit execution across all closed cycles.
+Max Consecutive Win Streak,6,Maximum sequential profitable trades without an intervening loss.
+Max Consecutive Loss Streak,5,Maximum sequential unprofitable trades without an intervening win.
+Fisher-Pearson Skewness,+0.18,Positive third standardized moment (m3 / s^3) demonstrating right-skewed P&L distribution (winners run further than losers).

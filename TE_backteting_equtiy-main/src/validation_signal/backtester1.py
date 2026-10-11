@@ -133,7 +133,7 @@ def format_ts(ts: Any) -> str:
     try:
         t = pd.Timestamp(ts)
         strftime_fn = getattr(t, "strftime", None)
-        if callable(strftime_fn) and bool(pd.notna(t)):
+        if callable(strftime_fn) and pd.notna(t):
             return str(strftime_fn("%Y-%m-%d"))
         return str(ts)[:10]
     except Exception:
@@ -142,18 +142,38 @@ def format_ts(ts: Any) -> str:
 
 def load_and_clean_signals(file_path: str) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
-    Intelligently inspects and cleans the signal Excel file.
+    Intelligently inspects and cleans the signal CSV or Excel file.
     Detects headers across any row and handles 'Active(on Date)' notations.
     """
     f_path = Path(file_path)
     if not f_path.exists():
-        raise FileNotFoundError(f"Signal file not found at: {file_path}")
+        alt_path = CURRENT_DIR / file_path
+        if alt_path.exists():
+            f_path = alt_path
+        else:
+            raise FileNotFoundError(f"Signal file not found at: {file_path}")
 
     bio = read_shared_file_bytes(str(f_path))
-    xl = pd.ExcelFile(bio)
-    first_sheet = xl.sheet_names[0]
-    bio.seek(0)
-    raw_df = pd.read_excel(bio, sheet_name=first_sheet, header=None)
+    file_name = f_path.name
+    is_csv = f_path.suffix.lower() == ".csv" or ".csv" in f_path.name.lower()
+
+    if is_csv:
+        first_sheet = file_name
+        try:
+            raw_df = pd.read_csv(bio, header=None)
+        except Exception:
+            bio.seek(0)
+            raw_df = pd.read_csv(bio, header=None, encoding="latin1")
+    else:
+        try:
+            xl = pd.ExcelFile(bio)
+            first_sheet = xl.sheet_names[0]
+            bio.seek(0)
+            raw_df = pd.read_excel(bio, sheet_name=first_sheet, header=None)
+        except Exception:
+            bio.seek(0)
+            first_sheet = file_name
+            raw_df = pd.read_csv(bio, header=None)
 
     # 1. Locate header row
     best_row_idx = -1
@@ -236,6 +256,7 @@ def load_and_clean_signals(file_path: str) -> Tuple[pd.DataFrame, Dict[str, Any]
 
     validation_meta = {
         "file_path": str(f_path),
+        "file_name": f_path.name,
         "sheet_name": first_sheet,
         "total_rows": len(df),
         "unique_stocks": df["stock"].nunique(),
@@ -643,7 +664,8 @@ def run_llm_validation_audit(
     trades: pd.DataFrame,
     metrics: Dict[str, Any],
     config: ValidationConfig,
-    out_dir: Path
+    out_dir: Path,
+    source_file_name: str = "signalsmain2.py.csv"
 ) -> Tuple[Dict[str, Any], pd.DataFrame, str]:
     """
     Performs 20-point quantitative audit using GPT-4o-mini (if API key available)
@@ -679,25 +701,25 @@ def run_llm_validation_audit(
     wr_expected = (w_tr / n_tr) * 100.0 if n_tr > 0 else 0.0
     wr_diff = abs(metrics["Win Rate %"] - wr_expected)
     add_check("Risk Metrics", "Win Rate Formula", "PASSED" if wr_diff < 0.01 else "FLAGGED",
-              f"{metrics['Win Rate %']}%", f"{round(wr_expected, 2)}%", "100%", "Formula: WinningTrades / TotalTrades.")
+              f"{metrics['Win Rate %']}%", f"{round(wr_expected, 2)}%", "100%", "Winning trades relative to total executed trades.")
 
     # 4. Loss Rate Formula
     lr_expected = (l_tr / n_tr) * 100.0 if n_tr > 0 else 0.0
     lr_diff = abs(metrics["Loss Rate %"] - lr_expected)
     add_check("Risk Metrics", "Loss Rate Formula", "PASSED" if lr_diff < 0.01 else "FLAGGED",
-              f"{metrics['Loss Rate %']}%", f"{round(lr_expected, 2)}%", "100%", "Formula: LosingTrades / TotalTrades.")
+              f"{metrics['Loss Rate %']}%", f"{round(lr_expected, 2)}%", "100%", "Losing trades relative to total executed trades.")
 
     # 5. Profit Factor Formula
     pf_calc = metrics["Profit Factor"]
     pf_expected = round(metrics["Gross Profit"] / abs(metrics["Gross Loss"]), 2) if abs(metrics["Gross Loss"]) > 0 else 999.0
     add_check("Profitability", "Profit Factor Formula", "PASSED" if abs(pf_calc - pf_expected) < 0.02 else "FLAGGED",
-              pf_calc, pf_expected, "100%", "Formula: Gross Profit / abs(Gross Loss). Robust buffer against losses.")
+              pf_calc, pf_expected, "100%", "Gross gains relative to gross losses. Robust buffer against losses.")
 
     # 6. Expectancy Value (EV) / Trading Edge
     ev_calc = metrics["Expectancy Value (EV)"]
     ev_expected = round(((w_tr / n_tr) * metrics["Average Win"]) + ((l_tr / n_tr) * metrics["Average Loss"]), 2)
     add_check("Trading Edge", "Expectancy Value (EV)", "PASSED" if abs(ev_calc - ev_expected) < 5.0 else "FLAGGED",
-              f"₹{ev_calc:,.2f}", f"₹{ev_expected:,.2f}", "100%", "Formula: (Win Rate * Avg Win) + (Loss Rate * Avg Loss). Positive edge confirmed.")
+              f"₹{ev_calc:,.2f}", f"₹{ev_expected:,.2f}", "100%", "Expected monetary profit generated per executed trade signal.")
 
     # 7. Initial vs Final Equity Consistency
     tot_pnl = metrics["Total P&L"]
@@ -711,7 +733,7 @@ def run_llm_validation_audit(
     years_val = metrics["Trading Years"]
     cagr_exp = round((((fin_eq / metrics["Initial Capital"]) ** (1.0 / years_val) - 1.0) * 100.0), 2)
     add_check("Returns", "CAGR Computation", "PASSED" if abs(cagr_val - cagr_exp) < 0.05 else "FLAGGED",
-              f"{cagr_val}%", f"{cagr_exp}%", "100%", f"Formula: (Final/Initial)^(1/{years_val} yrs) - 1.")
+              f"{cagr_val}%", f"{cagr_exp}%", "100%", f"Annualized growth rate over {years_val} trading years.")
 
     # 9. Sharpe Ratio Risk-Free Adjustment
     add_check("Risk Metrics", "Sharpe Ratio (Annualized)", "PASSED",
@@ -725,7 +747,7 @@ def run_llm_validation_audit(
     calmar_val = metrics["Calmar Ratio"]
     calmar_exp = round(metrics["CAGR %"] / abs(metrics["Maximum Drawdown %"]), 2) if abs(metrics["Maximum Drawdown %"]) > 0 else 0.0
     add_check("Risk Metrics", "Calmar Ratio", "PASSED" if abs(calmar_val - calmar_exp) < 0.05 else "FLAGGED",
-              calmar_val, calmar_exp, "100%", "Formula: CAGR % / abs(Max Drawdown %). Indicates healthy recovery potential.")
+              calmar_val, calmar_exp, "100%", "Annualized return relative to maximum drawdown magnitude.")
 
     # 12. Maximum Drawdown Sanity
     add_check("Drawdown", "Max Drawdown % Magnitude", "PASSED",
@@ -774,8 +796,47 @@ def run_llm_validation_audit(
 
     checklist_df = pd.DataFrame(checklist)
 
-    # Attempt OpenAI GPT-4o-mini completion if API key present
-    api_key = config.openai_api_key or os.environ.get("OPENAI_API_KEY", "")
+    # Auto-detect keys from environment or .env file
+    env_vars = {}
+    env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+    if env_file.exists():
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line_str = line.strip()
+                if "=" in line_str and not line_str.startswith("#"):
+                    k, v = line_str.split("=", 1)
+                    env_vars[k.strip()] = v.strip().strip('"').strip("'")
+
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or env_vars.get("GEMINI_API_KEY") or env_vars.get("GOOGLE_API_KEY")
+    groq_key = os.environ.get("GROQ_API_KEY") or env_vars.get("GROQ_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY") or env_vars.get("OPENROUTER_API_KEY")
+    openai_key = config.openai_api_key or os.environ.get("OPENAI_API_KEY") or env_vars.get("OPENAI_API_KEY")
+
+    api_key = None
+    base_url = None
+    target_model = config.openai_model
+    provider_name = "LLM Engine"
+
+    if gemini_key:
+        api_key = gemini_key
+        base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        target_model = "gemini-flash-latest"
+        provider_name = "Google Gemini"
+    elif groq_key:
+        api_key = groq_key
+        base_url = "https://api.groq.com/openai/v1"
+        target_model = "llama-3.3-70b-versatile"
+        provider_name = "Groq (Free)"
+    elif openrouter_key:
+        api_key = openrouter_key
+        base_url = "https://openrouter.ai/api/v1"
+        target_model = "google/gemini-2.5-flash:free"
+        provider_name = "OpenRouter (Free)"
+    elif openai_key:
+        api_key = openai_key
+        target_model = config.openai_model
+        provider_name = f"OpenAI ({config.openai_model})"
+
     llm_narrative = ""
     llm_engine_name = "Deterministic Quantitative Auditor"
     live_llm_metrics: Optional[List[Dict[str, str]]] = None
@@ -783,10 +844,14 @@ def run_llm_validation_audit(
     if api_key:
         try:
             from openai import OpenAI
-            client = OpenAI(api_key=api_key)
+            client_kwargs = {"api_key": api_key}
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            client = OpenAI(**client_kwargs)
             
-            # Prepare dataset summary from .xlsx without prompting internal formulas
-            signal_data_summary = f"""Signal Dataset Information (from trade logbook-Signal file.xlsx):
+            # Prepare dataset summary without prompting internal formulas
+            src_label = source_file_name if source_file_name else "signalsmain2.py.csv"
+            signal_data_summary = f"""Signal Dataset Information (from {src_label}):
 - Total Parsed Trade Signals: {len(trades)}
 - Unique Tickers: {trades['stock'].nunique()}
 - Timeline: {trades['entry_date'].min().strftime('%Y-%m-%d')} to {trades['exit_date'].max().strftime('%Y-%m-%d')}
@@ -801,7 +866,7 @@ def run_llm_validation_audit(
 """
             
             prompt = f"""You are a Principal Quantitative Risk Auditor and Financial Modeling Expert.
-Given the trade signal dataset from the .xlsx file described below, independently calculate the required portfolio and risk metrics using your own quantitative finance and mathematical knowledge. Do not rely on pre-supplied formulas.
+Given the trade signal dataset summary below, research and determine the optimal quantitative finance formulas for each metric, then independently calculate each required metric value.
 
 {signal_data_summary}
 
@@ -844,28 +909,45 @@ Return your response strictly as a JSON object with this format:
     }},
     ...
   ],
-  "narrative": "Detailed quantitative audit narrative discussing distribution, expectancy, and tail risk."
+  "narrative": "Detailed quantitative audit narrative discussing performance, risk distribution, expectancy, and tail risk."
 }}
 """
-            resp = client.chat.completions.create(
-                model=config.openai_model,
-                messages=[
-                    {"role": "system", "content": "You are a quantitative finance expert. Deliver rigorous, data-driven backtest audits in structured JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                response_format={"type": "json_object"}
-            )
+            messages_payload: Any = [
+                {"role": "system", "content": "You are a quantitative finance expert. Deliver rigorous, data-driven backtest audits in structured JSON."},
+                {"role": "user", "content": prompt}
+            ]
+            rf_payload: Any = {"type": "json_object"}
+
+            if "gemini" not in target_model.lower():
+                resp = client.chat.completions.create(
+                    model=target_model,
+                    messages=messages_payload,
+                    temperature=0.1,
+                    response_format=rf_payload
+                )
+            else:
+                resp = client.chat.completions.create(
+                    model=target_model,
+                    messages=messages_payload,
+                    temperature=0.1
+                )
             raw_content = resp.choices[0].message.content or "{}"
+            
+            # Clean possible markdown block backticks if present
+            if "```json" in raw_content:
+                raw_content = raw_content.split("```json", 1)[1].split("```", 1)[0].strip()
+            elif "```" in raw_content:
+                raw_content = raw_content.split("```", 1)[1].split("```", 1)[0].strip()
+
             parsed_json = json.loads(raw_content)
             if "narrative" in parsed_json:
                 llm_narrative = parsed_json["narrative"]
             if "metrics" in parsed_json and isinstance(parsed_json["metrics"], list):
                 live_llm_metrics = parsed_json["metrics"]
-            llm_engine_name = f"OpenAI ({config.openai_model})"
+            llm_engine_name = provider_name
         except Exception as e:
-            llm_narrative = f"OpenAI API call encountered: {e}. Defaulting to built-in Quantitative Auditor."
-            llm_engine_name = "Deterministic Quantitative Auditor (Fallback)"
+            llm_narrative = f"{provider_name} call encountered: {e}. Defaulting to built-in Quantitative Auditor."
+            llm_engine_name = f"{provider_name} (Fallback to Quantitative Auditor)"
 
     if not llm_narrative or "Defaulting" in llm_narrative:
         llm_narrative = f"""================================================================================
@@ -912,27 +994,27 @@ The backtest simulation on '{trades['stock'].nunique()}' stocks and {metrics['To
 ================================================================================
 """
 
-    # Build Independent LLM Verification Metrics Table (Clean 3-column format: No comparisons, no formulas, no status)
-    tot_trades = int(metrics.get("Total Trades", len(trades)))
-    w_cnt = int(metrics.get("Winning Trades", 0))
-    l_cnt = int(metrics.get("Losing Trades", 0))
-    init_cap = float(metrics.get("Initial Capital", 10000000.0))
-    fin_eq = float(metrics.get("Final Equity", 21395967.15))
-    tot_pnl_val = float(metrics.get("Total P&L", 11395967.15))
-    gross_p = float(metrics.get("Gross Profit", 19981765.81))
-    gross_l = float(metrics.get("Gross Loss", -8585798.66))
-    avg_w_val = float(metrics.get("Average Win", 49582.55))
-    avg_l_val = float(metrics.get("Average Loss", -27785.76))
-    wr_pct = float(metrics.get("Win Rate %", 51.08))
-    lr_pct = float(metrics.get("Loss Rate %", 39.16))
-    cagr_v = float(metrics.get("CAGR %", 6.94))
-    max_dd_p = float(metrics.get("Maximum Drawdown %", -12.95))
-    max_dd_inr_v = float(metrics.get("Maximum Drawdown (INR)", -2100115.58))
-    skew_v = float(metrics.get("Skewness", 1.7825))
-    ev_val = float(metrics.get("Expectancy Value (EV)", 14443.56))
-    sharpe_v = float(metrics.get("Sharpe Ratio", 2.14))
-    sortino_v = float(metrics.get("Sortino Ratio", 5.42))
-    calmar_v = float(metrics.get("Calmar Ratio", 0.54))
+    # Build Independent LLM Verification Metrics Table
+    tot_trades = metrics.get("Total Trades", len(trades))
+    w_cnt = metrics.get("Winning Trades", 0)
+    l_cnt = metrics.get("Losing Trades", 0)
+    init_cap = metrics.get("Initial Capital", 10000000.0)
+    tot_pnl_val = metrics.get("Total P&L", 0.0)
+    fin_eq = metrics.get("Final Equity", 0.0)
+    gross_p = metrics.get("Gross Profit", 0.0)
+    gross_l = metrics.get("Gross Loss", 0.0)
+    avg_w_val = metrics.get("Average Win", 0.0)
+    avg_l_val = metrics.get("Average Loss", 0.0)
+    wr_pct = metrics.get("Win Rate %", 0.0)
+    lr_pct = metrics.get("Loss Rate %", 0.0)
+    cagr_v = metrics.get("CAGR %", 0.0)
+    max_dd_p = metrics.get("Maximum Drawdown %", 0.0)
+    max_dd_inr_v = metrics.get("Maximum Drawdown (INR)", 0.0)
+    skew_v = metrics.get("Skewness", 0.0)
+    ev_val = metrics.get("Expectancy Value (EV)", 0.0)
+    sharpe_v = metrics.get("Sharpe Ratio", 0.0)
+    sortino_v = metrics.get("Sortino Ratio", 0.0)
+    calmar_v = metrics.get("Calmar Ratio", 0.0)
 
     llm_calculated_metrics: List[Dict[str, Any]] = []
 
@@ -1235,8 +1317,18 @@ def run_validation_simulation(
     7. Generates visual charts
     8. Returns complete payload for UI consumption
     """
-    if file_path is None:
-        file_path = str(CURRENT_DIR / "trade logbook-Signal file.xlsx")
+    if file_path is None or not file_path.strip():
+        default_csv = CURRENT_DIR / "signalsmain2.py.csv"
+        default_xlsx = CURRENT_DIR / "trade logbook-Signal file.xlsx"
+        if default_csv.exists():
+            file_path = str(default_csv)
+        else:
+            file_path = str(default_xlsx)
+    else:
+        # If relative or filename only, check CURRENT_DIR
+        p = Path(file_path)
+        if not p.exists() and (CURRENT_DIR / file_path).exists():
+            file_path = str(CURRENT_DIR / file_path)
 
     out_path = Path(output_dir) if output_dir else (CURRENT_DIR / "output")
     out_path.mkdir(parents=True, exist_ok=True)
@@ -1373,7 +1465,9 @@ def run_validation_simulation(
     yearly_df.to_csv(yearly_csv_path, index=False)
 
     # 7. LLM Validation & CSV 6 (llm_verification_metrics.csv)
-    llm_audit, checklist_df, llm_narrative = run_llm_validation_audit(trades, metrics, config, out_path)
+    llm_audit, checklist_df, llm_narrative = run_llm_validation_audit(
+        trades, metrics, config, out_path, source_file_name=val_meta.get("file_name", "signalsmain2.py.csv")
+    )
 
     # 8. Charts
     chart_paths = generate_validation_charts(daily_df, yearly_df, metrics, out_path)
@@ -1409,9 +1503,13 @@ def run_validation_simulation(
 # 10. CLI ENTRYPOINT
 # ==============================================================================
 def main():
+    default_input = str(CURRENT_DIR / "signalsmain2.py.csv")
+    if not Path(default_input).exists():
+        default_input = str(CURRENT_DIR / "trade logbook-Signal file.xlsx")
+
     parser = argparse.ArgumentParser(description="QuantLab Signal Validation & Backtesting Engine")
-    parser.add_argument("--input", "-i", default=str(CURRENT_DIR / "trade logbook-Signal file.xlsx"),
-                        help="Path to signal .xlsx file")
+    parser.add_argument("--input", "-i", default=default_input,
+                        help="Path to signal .csv or .xlsx file (Default: signalsmain2.py.csv)")
     parser.add_argument("--capital", "-c", type=float, default=10000000.0,
                         help="Initial Capital in INR (Default: 1 Cr = 10,000,000)")
     parser.add_argument("--allocation", "-a", type=float, default=0.02,

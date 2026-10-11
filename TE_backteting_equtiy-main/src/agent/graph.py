@@ -7,7 +7,7 @@ LangGraph StateGraph builder for Equity Strategy Research Workflow.
 import os
 import sys
 import pandas as pd
-from typing import Optional
+from typing import Optional, cast, Any
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC_DIR = os.path.join(BASE_DIR, "src")
@@ -37,7 +37,9 @@ def node_load_data(state: BacktestState) -> BacktestState:
 
 def node_run_backtest(state: BacktestState) -> BacktestState:
     """Node 2: Backtest Tool call."""
-    price_df = state["price_df"]
+    price_df = state.get("price_df")
+    if price_df is None:
+        raise ValueError("price_df is uninitialized in BacktestState")
     res = run_backtest_tool(
         price_df,
         strategy_name=state["strategy_name"],
@@ -58,9 +60,13 @@ def node_run_backtest(state: BacktestState) -> BacktestState:
 
 def node_calculate_metrics(state: BacktestState) -> BacktestState:
     """Node 3: Metrics Tool call."""
+    portfolio_df = state.get("portfolio_df")
+    trade_log_df = state.get("trade_log_df")
+    if portfolio_df is None or trade_log_df is None:
+        raise ValueError("portfolio_df or trade_log_df is uninitialized in BacktestState")
     metrics = calculate_metrics_tool(
-        state["portfolio_df"],
-        state["trade_log_df"],
+        portfolio_df,
+        trade_log_df,
         initial_capital=state.get("initial_capital", 100000.0)
     )
     state["metrics"] = metrics
@@ -81,7 +87,13 @@ def node_controlled_iteration(state: BacktestState) -> BacktestState:
 def node_generate_artifacts(state: BacktestState) -> BacktestState:
     """Node 6: LLM Analysis & Visualization Artifact Generator."""
     ticker = state["ticker"]
-    metrics = state["metrics"]
+    metrics = state.get("metrics")
+    portfolio_df = state.get("portfolio_df")
+
+    if metrics is None:
+        raise ValueError("metrics is uninitialized in BacktestState")
+    if portfolio_df is None:
+        raise ValueError("portfolio_df is uninitialized in BacktestState")
 
     # LLM Strategy Analysis
     llm_analysis = analyze_performance_tool(metrics, ticker, state["strategy_name"])
@@ -91,8 +103,8 @@ def node_generate_artifacts(state: BacktestState) -> BacktestState:
     os.makedirs(res_dir, exist_ok=True)
 
     try:
-        plot_equity_curve(state["portfolio_df"], ticker, os.path.join(res_dir, "equity_curve.png"))
-        plot_drawdown(state["portfolio_df"], os.path.join(res_dir, "drawdown.png"))
+        plot_equity_curve(portfolio_df, ticker, os.path.join(res_dir, "equity_curve.png"))
+        plot_drawdown(portfolio_df, os.path.join(res_dir, "drawdown.png"))
     except Exception as e:
         print(f"[Graph Node: Artifacts] Chart warning: {e}")
 
@@ -106,7 +118,7 @@ def build_agent_graph():
     if not HAS_LANGGRAPH:
         return None
 
-    builder = StateGraph(BacktestState)
+    builder = StateGraph(cast(Any, BacktestState))
 
     builder.add_node("load_data", node_load_data)
     builder.add_node("run_backtest", node_run_backtest)

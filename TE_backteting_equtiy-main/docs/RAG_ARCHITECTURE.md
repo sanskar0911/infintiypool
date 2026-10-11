@@ -3,28 +3,15 @@
 ## Overview
 QUANTLAB features an 8-Stage Multilingual Retrieval-Augmented Generation (RAG) Architecture designed for high-precision quantitative finance Q&A and research interpretation.
 
-```text
-USER INPUT
-   ↓
-LANGUAGE DETECTION
-   ↓
-INPUT LANGUAGE → MADRID TRANSLATION
-   ↓
-MADRID QUERY
-   ↓
-RAG RETRIEVAL (Vector Store Search)
-   ↓
-RETRIEVED KNOWLEDGE (Top-K Chunks + Similarity Scores)
-   ↓
-MADRID QUERY + RAG CONTEXT
-   ↓
-LLM GROUNDED REASONING
-   ↓
-LLM RESPONSE IN MADRID
-   ↓
-MADRID DECODER → ORIGINAL USER LANGUAGE
-   ↓
-FINAL USER OUTPUT + TOKEN ANALYTICS + STAGE VISUALIZATION
+```mermaid
+flowchart TD
+    User["Stage 1: User Input Query"] --> Detect["Stage 2: Language Detector"]
+    Detect --> Encode["Stage 3: MADRID Encoder"]
+    Encode --> VectorSearch["Stage 4: RAG Retrieval (FAISS / NumPy Vector Store)"]
+    VectorSearch --> Filter["Stage 5: Similarity Filter & Grounding Threshold (<0.20)"]
+    Filter --> Synthesis["Stage 6: Grounded LLM Context Synthesis"]
+    Synthesis --> Decode["Stage 7: MADRID Target Decoder"]
+    Decode --> Output["Stage 8: Final User Output & Token Analytics"]
 ```
 
 ## Key Components

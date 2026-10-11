@@ -6,7 +6,7 @@ Master Entry Point for LangGraph Agent Workflow with Loop Engineering.
 
 import os
 import sys
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC_DIR = os.path.join(BASE_DIR, "src")
@@ -74,7 +74,7 @@ def run_agent_workflow(
     graph = build_agent_graph()
     if graph is not None:
         print("[Workflow Runner] Executing via compiled LangGraph StateGraph...")
-        return graph.invoke(initial_state)
+        return cast(BacktestState, graph.invoke(initial_state))
     else:
         print("[Workflow Runner] Executing via Sequential Loop State Machine Fallback...")
         s = node_load_data(initial_state)

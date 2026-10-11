@@ -10,27 +10,17 @@
 
 Instead of executing an agentic workflow in a single linear pass (Single-Shot Agent), **Loop Engineering** empowers the agent to evaluate its intermediate quantitative outputs against predefined criteria and perform controlled, bounded iterations before delivering the final report.
 
-```text
-                 USER / HYPOTHESIS
-                         ↓
-                     BASELINE
-                         ↓
-                     TOOL CALL
-                         ↓
-                    ANALYSIS
-                         ↓
-                  EVALUATION
-                         ↓
-                  ┌──────┴──────┐
-                  │             │
-                PASS          ITERATE
-                  │             │
-                  ↓             ↓
-                FINAL      CONTROLLED
-                RESULT     RE-EVALUATION
-                                │
-                                ↓
-                              STOP
+```mermaid
+flowchart TD
+    User["User Goal / Hypothesis"] --> Baseline["Initial Baseline Setup (Iteration 1)"]
+    Baseline --> ToolCall["Execute Backtest & Metrics Tools"]
+    ToolCall --> Analysis["Compute Sharpe, CAGR, Drawdown"]
+    Analysis --> Evaluator["Research Evaluator Decision Node"]
+
+    Evaluator -- "ACCEPT (Sharpe >= 0.8)" --> Final["Generate Final LLM Analysis & Artifacts"]
+    Evaluator -- "ITERATE (Sharpe < 0.8 & iter < max)" --> Controlled["Controlled Parameter Adjustment (+5, +10)"]
+    Controlled --> ToolCall
+    Evaluator -- "STOP (iter >= max_iterations)" --> Final
 ```
 
 > **Presentation Summary:** *"Instead of executing the workflow once, the agent evaluates its result and can perform a controlled iteration before producing the final result."*

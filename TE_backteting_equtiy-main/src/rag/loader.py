@@ -6,10 +6,10 @@ with rich metadata extraction (source, category, topic, section, version).
 """
 
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
-def load_knowledge_base_docs(kb_dir: str = None) -> List[Dict[str, Any]]:
+def load_knowledge_base_docs(kb_dir: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Recursively load all markdown documents across knowledge_base subdirectories and docs.
 

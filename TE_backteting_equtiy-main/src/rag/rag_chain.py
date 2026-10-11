@@ -9,7 +9,7 @@ import os
 import sys
 import time
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC_DIR = os.path.join(BASE_DIR, "src")
@@ -66,7 +66,7 @@ def clean_chunks_to_paragraphs(retrieved_chunks: List[Dict[str, Any]]) -> str:
 class RAGChain:
     """Complete 8-Stage Multilingual RAG + MADRID Pipeline Coordinator."""
 
-    def __init__(self, retriever: RAGRetriever = None):
+    def __init__(self, retriever: Optional[RAGRetriever] = None):
         self.retriever = retriever or get_retriever()
         self.translator = MultilingualMADRIDTranslator()
         self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY")
@@ -200,7 +200,8 @@ class RAGChain:
                     ],
                     temperature=0.2
                 )
-                llm_direct_answer = res.choices[0].message.content.strip()
+                raw_content = res.choices[0].message.content
+                llm_direct_answer = raw_content.strip() if raw_content is not None else ""
                 madrid_response = f"[MADRID::RESPONSE | TOPIC:{retrieved_chunks[0]['topic']}]\n{llm_direct_answer}"
             except Exception:
                 pass

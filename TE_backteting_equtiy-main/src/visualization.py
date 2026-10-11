@@ -197,7 +197,8 @@ def plot_trade_distribution(trade_log_df: pd.DataFrame, output_path: str) -> Non
     if trade_returns:
         n_bins = max(5, min(20, len(trade_returns)))
         n, bins, patches = ax.hist(trade_returns, bins=n_bins, color="#3498DB", edgecolor="black", alpha=0.7)
-        for b, patch in zip(bins, patches):
+        patch_list = list(patches) if hasattr(patches, "__iter__") else [patches]
+        for b, patch in zip(bins, patch_list):
             if b < 0:
                 patch.set_facecolor("#E74C3C")
             else:

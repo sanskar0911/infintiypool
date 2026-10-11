@@ -98,8 +98,8 @@ def calculate_metrics(
             buy_row = buys.iloc[idx]
             sell_row = sells.iloc[idx]
             
-            buy_date = buy_row.name if isinstance(buy_row.name, pd.Timestamp) else pd.to_datetime(buy_row.name)
-            sell_date = sell_row.name if isinstance(sell_row.name, pd.Timestamp) else pd.to_datetime(sell_row.name)
+            buy_date = buy_row.name if isinstance(buy_row.name, pd.Timestamp) else pd.to_datetime(str(buy_row.name))
+            sell_date = sell_row.name if isinstance(sell_row.name, pd.Timestamp) else pd.to_datetime(str(sell_row.name))
             
             days_held = (sell_date - buy_date).days
             holding_periods.append(max(days_held, 1))

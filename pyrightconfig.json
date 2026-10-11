@@ -1,0 +1,11 @@
+{
+  "include": [
+    "TE_backteting_equtiy-main/src",
+    "TE_backteting_equtiy-main/tests"
+  ],
+  "extraPaths": [
+    "TE_backteting_equtiy-main/src",
+    "TE_backteting_equtiy-main"
+  ],
+  "pythonVersion": "3.13"
+}

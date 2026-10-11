@@ -1572,7 +1572,7 @@ INDEX_HTML = """<!DOCTYPE html>
     <!-- SIGNAL VALIDATION & METRICS AUDIT SECTION                      -->
     <!-- ============================================================== -->
     <div id="validation-view" class="hidden">
-        <!-- Validation Header & Action Banner (Clean, no messy form clutter) -->
+        <!-- Validation Header & Action Banner (Clean, with Signal Source Selector) -->
         <div class="val-header-card" style="padding: 1.5rem 1.8rem; background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.75rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); margin-bottom: 1.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.2rem;">
                 <div>
@@ -1586,11 +1586,11 @@ INDEX_HTML = """<!DOCTYPE html>
                         </span>
                     </div>
                     <p style="color: var(--text-secondary); font-size: 0.88rem; margin: 0.2rem 0 0.8rem 0; line-height: 1.45;">
-                        Simulating <span style="color: #60a5fa; font-weight: 600;">trade logbook-Signal file.xlsx</span> against specifications in <span style="color: #34d399; font-weight: 600;">BACKTESTING REPORT.pdf</span>. Featuring autonomous quantitative math audit with GPT-4o-mini.
+                        Simulating <span id="val-source-desc" style="color: #60a5fa; font-weight: 600;">signalsmain2.py.csv</span> against specifications in <span style="color: #34d399; font-weight: 600;">BACKTESTING REPORT.pdf</span>. Featuring autonomous quantitative math audit with AI.
                     </p>
                     <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                        <span class="badge" style="background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
-                            📁 Source: trade logbook-Signal file.xlsx (789 Signals)
+                        <span id="val-badge-source" class="badge" style="background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+                            📁 Source: signalsmain2.py.csv (125 Signals)
                         </span>
                         <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
                             💼 Initial Capital: ₹1.00 Cr
@@ -1598,16 +1598,25 @@ INDEX_HTML = """<!DOCTYPE html>
                         <span class="badge" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
                             🎯 2.0% Fixed Alloc (₹2.00 L / Trade)
                         </span>
-                        <span class="badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
-                            🤖 Autonomous AI Auditor: GPT-4o-mini
+                        <span id="val-badge-model" class="badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+                            🤖 Autonomous AI Auditor: Google Gemini / GPT-4o-mini
                         </span>
                     </div>
                 </div>
-                <div>
-                    <button class="btn-primary" id="val-run-btn" onclick="executeValidationSimulation()" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45); font-weight: 700; padding: 0.8rem 1.6rem; font-size: 0.95rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.6rem; cursor: pointer; transition: all 0.2s;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        <span>Run Validation & AI Verification</span>
-                    </button>
+                <div style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column; gap: 0.3rem;">
+                        <label for="val-file-select" style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Signal Input File:</label>
+                        <select id="val-file-select" onchange="executeValidationSimulation()" style="background: rgba(30, 41, 59, 0.95); color: #f8fafc; border: 1px solid rgba(59, 130, 246, 0.5); border-radius: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.88rem; font-weight: 600; cursor: pointer; outline: none;">
+                            <option value="signalsmain2.py.csv" selected>signalsmain2.py.csv (New Signal File - 125 Trades)</option>
+                            <option value="trade logbook-Signal file.xlsx">trade logbook-Signal file.xlsx (Original Logbook - 789 Trades)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; justify-content: flex-end; padding-top: 1.1rem;">
+                        <button class="btn-primary" id="val-run-btn" onclick="executeValidationSimulation()" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45); font-weight: 700; padding: 0.65rem 1.4rem; font-size: 0.92rem; border-radius: 0.5rem; display: flex; align-items: center; gap: 0.6rem; cursor: pointer; transition: all 0.2s;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            <span>Run Validation & AI Verification</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1616,62 +1625,62 @@ INDEX_HTML = """<!DOCTYPE html>
         <div class="val-kpi-grid">
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Final Equity</div>
-                <div class="val-kpi-val positive" id="val-card-equity">₹2,13,95,967</div>
-                <div class="val-kpi-sub">Capital: ₹1.00 Cr (<span style="color:#10b981; font-weight:700;" id="val-card-total-return">+113.96%</span>)</div>
+                <div class="val-kpi-val positive" id="val-card-equity">₹1,09,03,733</div>
+                <div class="val-kpi-sub">Capital: ₹1.00 Cr (<span style="color:#10b981; font-weight:700;" id="val-card-total-return">+9.04%</span>)</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Total Net P&L</div>
-                <div class="val-kpi-val positive" id="val-card-pnl">+₹1,13,95,967</div>
-                <div class="val-kpi-sub">Avg Trade: <span id="val-card-avg-trade">₹14,443.56</span></div>
+                <div class="val-kpi-val positive" id="val-card-pnl">+₹9,03,733</div>
+                <div class="val-kpi-sub">Avg Trade: <span id="val-card-avg-trade">₹7,229.86</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #3b82f6;">
                 <div class="val-kpi-label">CAGR</div>
-                <div class="val-kpi-val neutral" id="val-card-cagr">6.94%</div>
+                <div class="val-kpi-val neutral" id="val-card-cagr">0.77%</div>
                 <div class="val-kpi-sub">Duration: <span id="val-card-span">11.34 Years</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #60a5fa;">
                 <div class="val-kpi-label">Win Rate</div>
-                <div class="val-kpi-val neutral" id="val-card-winrate">51.08%</div>
-                <div class="val-kpi-sub">Wins: <span id="val-card-wins" style="color:#10b981;">403</span> | Losses: <span id="val-card-losses" style="color:#ef4444;">309</span></div>
+                <div class="val-kpi-val neutral" id="val-card-winrate">46.40%</div>
+                <div class="val-kpi-sub">Wins: <span id="val-card-wins" style="color:#10b981;">58</span> | Losses: <span id="val-card-losses" style="color:#ef4444;">67</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Profit Factor</div>
-                <div class="val-kpi-val positive" id="val-card-profitfactor">2.33</div>
-                <div class="val-kpi-sub">Gross Win/Loss: ₹1.99Cr / ₹85.86L</div>
+                <div class="val-kpi-val positive" id="val-card-profitfactor">1.75</div>
+                <div class="val-kpi-sub">Gross Win/Loss: ₹21.06L / ₹12.02L</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #8b5cf6;">
                 <div class="val-kpi-label">Expectancy (EV)</div>
-                <div class="val-kpi-val" style="color: #a78bfa;" id="val-card-ev">₹14,443.56</div>
-                <div class="val-kpi-sub">Trading Edge: <span id="val-card-ev-pct" style="color:#34d399;">+7.22% / trade</span></div>
+                <div class="val-kpi-val" style="color: #a78bfa;" id="val-card-ev">₹7,229.86</div>
+                <div class="val-kpi-sub">Trading Edge: <span id="val-card-ev-pct" style="color:#34d399;">+3.61% / trade</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #3b82f6;">
                 <div class="val-kpi-label">Sharpe Ratio</div>
-                <div class="val-kpi-val neutral" id="val-card-sharpe">2.14</div>
+                <div class="val-kpi-val neutral" id="val-card-sharpe">0.48</div>
                 <div class="val-kpi-sub">Rf Discount: 6.0% Annualized</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #ef4444;">
                 <div class="val-kpi-label">Max Drawdown</div>
-                <div class="val-kpi-val negative" id="val-card-maxdd">-12.95%</div>
-                <div class="val-kpi-sub">Trough: <span id="val-card-maxdd-inr">₹-21,00,115</span></div>
+                <div class="val-kpi-val negative" id="val-card-maxdd">-2.91%</div>
+                <div class="val-kpi-sub">Trough: <span id="val-card-maxdd-inr">₹-3,01,817</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Sortino Ratio</div>
-                <div class="val-kpi-val positive" id="val-card-sortino">5.42</div>
+                <div class="val-kpi-val positive" id="val-card-sortino">0.98</div>
                 <div class="val-kpi-sub">Downside Risk Adjusted</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #f59e0b;">
                 <div class="val-kpi-label">Calmar Ratio</div>
-                <div class="val-kpi-val" style="color: #fbbf24;" id="val-card-calmar">0.54</div>
+                <div class="val-kpi-val" style="color: #fbbf24;" id="val-card-calmar">0.26</div>
                 <div class="val-kpi-sub">CAGR / abs(Max DD)</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #ec4899;">
                 <div class="val-kpi-label">Max Streaks</div>
-                <div class="val-kpi-val" style="font-size: 1.35rem; color: #f472b6;" id="val-card-streaks">12W / 13L</div>
-                <div class="val-kpi-sub">Max Consec Profit: ₹13.16L</div>
+                <div class="val-kpi-val" style="font-size: 1.35rem; color: #f472b6;" id="val-card-streaks">6W / 5L</div>
+                <div class="val-kpi-sub">Max Consec Profit: ₹2.53L</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #06b6d4;">
                 <div class="val-kpi-label">Skewness</div>
-                <div class="val-kpi-val" style="color: #22d3ee;" id="val-card-skewness">+1.7825</div>
+                <div class="val-kpi-val" style="color: #22d3ee;" id="val-card-skewness">+1.8530</div>
                 <div class="val-kpi-sub">Positive Skew (Right-Tailed)</div>
             </div>
         </div>
@@ -1684,7 +1693,8 @@ INDEX_HTML = """<!DOCTYPE html>
                 </div>
                 <div class="tabs" id="val-subtabs">
                     <button class="tab-btn active" data-vtab="metrics">📋 Metrics & PDF Formulas</button>
-                    <button class="tab-btn" data-vtab="llm">🤖 AI Verification (GPT-4o-mini)</button>
+                    <button class="tab-btn" data-vtab="charts">📈 Validation Charts</button>
+                    <button class="tab-btn" data-vtab="llm">🤖 AI Verification</button>
                     <button class="tab-btn" data-vtab="downloads">💾 CSV Exports & Downloads</button>
                 </div>
             </div>
@@ -1708,6 +1718,23 @@ INDEX_HTML = """<!DOCTYPE html>
                             <!-- Populated dynamically by JS -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- SECTION 1B: Validation Visual Charts & Curves -->
+            <div id="vtab-content-charts" class="val-tab-pane hidden">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div class="tabs" id="val-chart-subtabs">
+                        <button class="tab-btn active" data-vchart="equity">📈 Equity Growth Curve</button>
+                        <button class="tab-btn" data-vchart="drawdown">📉 Underwater Drawdown</button>
+                        <button class="tab-btn" data-vchart="histogram">📊 Annual Returns Histogram</button>
+                    </div>
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        High Definition (200 DPI)
+                    </span>
+                </div>
+                <div class="chart-container" style="background: #111827; border-radius: 0.5rem; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 480px; padding: 1rem;">
+                    <img id="val-display-chart" src="/validation_img/equity_curve.png" alt="Validation Chart" style="max-width: 100%; height: auto; border-radius: 0.375rem; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
                 </div>
             </div>
 
@@ -1797,7 +1824,7 @@ INDEX_HTML = """<!DOCTYPE html>
                                 <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-size: 0.72rem;">AI VERIFICATION</span>
                             </div>
                             <div style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 1.2rem; line-height: 1.5;">
-                                Autonomous AI verification dataset. Quantitative metrics independently computed by GPT-4o-mini directly from <em>trade logbook-Signal file.xlsx</em> along with financial rationale notes.
+                                Autonomous AI verification dataset. Quantitative metrics independently computed by AI directly from the active signal file along with financial rationale notes.
                             </div>
                         </div>
                         <button class="btn-primary" onclick="downloadValidationCSV('llm_verification_metrics.csv')" style="width: 100%; font-weight: 700; padding: 0.7rem; font-size: 0.9rem; background: linear-gradient(135deg, #a855f7, #7e22ce); display: flex; justify-content: center; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(168, 85, 247, 0.3);">
@@ -2409,8 +2436,10 @@ INDEX_HTML = """<!DOCTYPE html>
 
         async function executeValidationSimulation() {
             const runBtn = document.getElementById('val-run-btn');
+            const fileSelect = document.getElementById('val-file-select');
+            const selectedFile = fileSelect ? fileSelect.value : 'signalsmain2.py.csv';
             const origHtml = runBtn.innerHTML;
-            runBtn.innerHTML = `⏳ Simulating & Verifying with GPT-4o-mini...`;
+            runBtn.innerHTML = `⏳ Simulating & Verifying with AI...`;
             runBtn.disabled = true;
 
             try {
@@ -2418,6 +2447,7 @@ INDEX_HTML = """<!DOCTYPE html>
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        file: selectedFile,
                         capital: 10000000,
                         allocation: 0.02,
                         risk_free: 0.06,
@@ -2444,6 +2474,26 @@ INDEX_HTML = """<!DOCTYPE html>
 
         function renderValidationDashboard(data) {
             const m = data.metrics;
+            const vm = data.validation_meta;
+
+            // Update Dynamic Source Labels
+            if (vm) {
+                const badgeSource = document.getElementById('val-badge-source');
+                if (badgeSource) {
+                    badgeSource.innerText = `📁 Source: ${vm.file_name || 'signalsmain2.py.csv'} (${vm.total_rows || data.trade_count} Signals)`;
+                }
+                const descSource = document.getElementById('val-source-desc');
+                if (descSource) {
+                    descSource.innerText = vm.file_name || 'signalsmain2.py.csv';
+                }
+            }
+
+            if (data.llm_audit && data.llm_audit.engine) {
+                const modelBadge = document.getElementById('val-badge-model');
+                if (modelBadge) {
+                    modelBadge.innerText = `🤖 Autonomous AI Auditor: ${data.llm_audit.engine}`;
+                }
+            }
 
             // 1. Update 12 KPI Cards
             document.getElementById('val-card-equity').innerText = '₹' + formatCurrency(m['Final Equity']);
@@ -2474,6 +2524,15 @@ INDEX_HTML = """<!DOCTYPE html>
 
             // 4. Render Section 3: Live CSV Previews
             renderValidationCSVPreviews(data);
+
+            // 5. Refresh Visual Charts
+            const chartImg = document.getElementById('val-display-chart');
+            if (chartImg) {
+                const ts = new Date().getTime();
+                if (activeValChart === 'equity') chartImg.src = '/validation_img/equity_curve.png?' + ts;
+                else if (activeValChart === 'drawdown') chartImg.src = '/validation_img/drawdown_curve.png?' + ts;
+                else if (activeValChart === 'histogram') chartImg.src = '/validation_img/yearly_return_histogram.png?' + ts;
+            }
         }
 
         function renderValidationMetricsTable(m) {
@@ -2754,7 +2813,9 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
                 model = query.get("model", ["gpt-4o-mini"])[0]
                 api_key = query.get("api_key", [""])[0]
                 mode = query.get("mode", ["long_only"])[0]
+                sig_file = query.get("file", ["signalsmain2.py.csv"])[0]
                 val_res = run_validation_simulation(
+                    file_path=sig_file,
                     initial_capital=cap,
                     allocation=alloc,
                     risk_free=rf,
@@ -2859,7 +2920,9 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
                 model = payload.get("model", "gpt-4o-mini")
                 api_key = payload.get("api_key", "")
                 mode = payload.get("mode", "long_only")
+                sig_file = payload.get("file") or payload.get("signal_file", "signalsmain2.py.csv")
                 val_res = run_validation_simulation(
+                    file_path=sig_file,
                     initial_capital=cap,
                     allocation=alloc,
                     risk_free=rf,

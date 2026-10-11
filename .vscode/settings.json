@@ -1,0 +1,10 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/TE_backteting_equtiy-main/src",
+    "${workspaceFolder}/TE_backteting_equtiy-main"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/TE_backteting_equtiy-main/src",
+    "${workspaceFolder}/TE_backteting_equtiy-main"
+  ]
+}

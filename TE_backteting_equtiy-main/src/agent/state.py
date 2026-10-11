@@ -4,7 +4,8 @@ state.py
 LangGraph Agent State definition for Equity Backtesting Workflow.
 """
 
-from typing import Dict, Any, TypedDict, Optional, List
+from typing import Dict, Any, Optional, List
+from typing_extensions import TypedDict
 import pandas as pd
 
 

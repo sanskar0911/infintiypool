@@ -10,32 +10,18 @@
 
 The agentic workflow is built using **LangGraph** (`src/agent/`). It orchestrates a modular, state-driven research process where an autonomous agent invokes deterministic tools to ingest market data, execute backtests, compute performance metrics, and generate AI quantitative reports.
 
-```text
-               User Goal / Hypothesis
-                         │
-                         ▼
-                    [Load Data] (DataLoader Tool)
-                         │
-                         ▼
-                  [Run Backtest] (Backtest Tool)
-                         │
-                         ▼
-               [Calculate Metrics] (Metrics Tool)
-                         │
-                         ▼
-             [Research Evaluator Node]
-                         │
-              ┌──────────┴──────────┐
-              │                     │
-           Pass                 Iterate
-              │                     │
-              ▼                     ▼
-     [LLM Analysis Tool]   [Controlled Iteration Node]
-              │                     │
-              ▼                     └───────┐
-      [Final Output]                        │
-                                            ▼
-                                     (Loop back to Backtest)
+```mermaid
+flowchart TD
+    Goal["User Goal / Hypothesis"] --> LoadData["node_load_data (DataLoader Tool)"]
+    LoadData --> Backtest["node_run_backtest (Backtest Tool)"]
+    Backtest --> Metrics["node_calculate_metrics (Metrics Tool)"]
+    Metrics --> Evaluator["node_evaluator (Research Evaluator)"]
+
+    Evaluator -- "ACCEPT / STOP" --> Artifacts["node_generate_artifacts (LLM Analysis & Visualization)"]
+    Evaluator -- "ITERATE (Sharpe < 0.8)" --> ControlledIter["node_controlled_iteration (Parameter Adjustment)"]
+    ControlledIter --> Backtest
+
+    Artifacts --> Output["Final Output Artifacts & Fact Sheet"]
 ```
 
 ---

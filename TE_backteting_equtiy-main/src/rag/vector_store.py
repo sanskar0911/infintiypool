@@ -6,7 +6,7 @@ and top-K similarity search with score calculation.
 """
 
 import importlib.util
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import numpy as np
 
 HAS_FAISS = False
@@ -26,7 +26,7 @@ class VectorStoreManager:
     def __init__(self):
         self.index = None
         self.chunks: List[Dict[str, Any]] = []
-        self.embeddings: np.ndarray = None
+        self.embeddings: Optional[np.ndarray] = None
 
     def build_index(self, chunks: List[Dict[str, Any]], embeddings: np.ndarray):
         """Build vector index from document chunk embeddings."""

@@ -5,11 +5,11 @@ FINAL STRATEGY FACT SHEET — SHANKH / DECUPLE INTERNSHIP 2026-27 (TE1)
 1. STRATEGY SPECIFICATIONS & METADATA
 --------------------------------------------------------------------------------
 Strategy Name         : SMA Crossover Strategy
-Stock Ticker / Universe: INFY
+Stock Ticker / Universe: RELIANCE
 Hypothesis            : Quantitative momentum / trend following strategy
 Date Range            : 2020-01-01 to 2024-12-31
 Initial Capital        : INR 100,000.00
-Final Portfolio Value  : INR 97,862.32
+Final Portfolio Value  : INR 102,451.81
 
 2. EXECUTION & PORTFOLIO RULES
 --------------------------------------------------------------------------------
@@ -22,27 +22,27 @@ Stop Loss / Take Profit: SL 5.0% | TP 10.0%
 
 3. PERFORMANCE & RETURN METRICS
 --------------------------------------------------------------------------------
-Total Return          : -2.14%
-CAGR (Compound Ann)   : -0.43%
-Annualized Volatility : 5.02%
-Sharpe Ratio (Rf=0)   : -0.0625
-Sortino Ratio (Rf=0)  : -0.0243
-Maximum Drawdown (MDD): -4.42%
+Total Return          : 2.45%
+CAGR (Compound Ann)   : 0.49%
+Annualized Volatility : 2.52%
+Sharpe Ratio (Rf=0)   : 0.2080
+Sortino Ratio (Rf=0)  : 0.1585
+Maximum Drawdown (MDD): -5.57%
 
 4. TRADING & EXPOSURE STATISTICS
 --------------------------------------------------------------------------------
-Total Executed Trades : 11
-Trade Win Rate        : 45.45%
-Annual Portfolio Turnover: 47.20%
-Market Time Exposure  : 0.89%
+Total Executed Trades : 16
+Trade Win Rate        : 31.25%
+Annual Portfolio Turnover: 63.60%
+Market Time Exposure  : 23.99%
 
 5. BENCHMARK COMPARISON (NIFTY50)
 --------------------------------------------------------------------------------
-Strategy CAGR vs Benchmark: -0.43% vs 16.10%
-Excess Annual Return   : -16.53%
-Strategy Sharpe vs Bench  : -0.06 vs 0.84
-Portfolio Beta        : -0.01
-Correlation with Bench: -0.04
+Strategy CAGR vs Benchmark: 0.49% vs 16.10%
+Excess Annual Return   : -15.61%
+Strategy Sharpe vs Bench  : 0.21 vs 0.84
+Portfolio Beta        : 0.03
+Correlation with Bench: 0.21
 Information Ratio     : -0.77
 
 6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS

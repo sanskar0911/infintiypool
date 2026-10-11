@@ -1,0 +1,113 @@
+% This is the report Template for Fr.C Rodrigues Institute Of Technology, Vashi
+
+
+
+% Modularised every section into different .tex file
+
+% This is the preamble.  
+
+% any package you would like to use please add it to this .tex and not the other .tex files because if you do...the code will not compile! Other .tex files are only for filing content. Any styling has to happen in this file.
+
+% Good Luck!
+
+\documentclass[12pt]{report}
+\usepackage{hyperref}
+\usepackage{kantlipsum}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{ragged2e}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\centering}
+  {\chaptertitlename\ \thechapter}{24pt}{\Huge}
+\geometry{verbose,a4paper,tmargin=15mm,bmargin=30mm,lmargin=30mm,rmargin=20mm}
+
+%creating a user defined footer and header
+\geometry{headheight=15pt}
+\setcounter{tocdepth}{3}
+\setcounter{secnumdepth}{3}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Project title}
+\lfoot{F.C.R.I.T, Vashi}
+\rfoot{\thepage}
+\renewcommand{\footrulewidth}{0.6pt}
+\renewcommand{\headrulewidth}{1.pt}
+
+\begin{document}
+\pagestyle{plain}
+\include{1Title}
+\pagenumbering{roman}
+
+%\pagenumbering{gobble}
+
+\include{2Approval}
+\include{3Declaration}
+
+% Table of Contents
+\newpage
+
+%Abstract
+\addcontentsline{toc}{chapter}{Abstract}
+\include{Abstract}
+
+\tableofcontents
+\newpage
+
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+\newpage
+
+\addcontentsline{toc}{chapter}{List of Tables}
+\listoftables
+\newpage
+
+\newpage
+
+\pagenumbering{arabic}
+
+\pagestyle{fancy}
+\include{Chapter1Introduction}
+\include{Chapter2LiteratureSurvey}
+\include{Chapter3ProposedSystem}
+\include{Chapter4Design}
+\include{Chapter5ResultandDiscussion}
+\include{Chapter6Conclusion}
+
+\addcontentsline{toc}{chapter}{References}
+
+%\addcontentsline{toc}{chapter}{\bibname}
+
+% Pick your poison 
+% For the style of bibliography, ieeetr is preferred but when referencing I have observed that unsrt or plain works better.
+
+%\bibliographystyle{alpha}
+%\bibliographystyle{unsrt}
+%\bibliographystyle{abbrv}
+
+\bibliographystyle{ieeetr}
+
+\renewcommand\bibname{References}
+\bibliography{0Synopsis}
+
+\addcontentsline{toc}{chapter}{Acknowledgement}
+\include{Acknowledgment}
+
+
+%\addcontentsline{toc}{chapter}{Acknowledgement}
+%\include{92Acknowledgment}
+\addcontentsline{toc}{chapter}{Appendix A: Timeline Chart}
+\include{appendixA}
+
+
+
+\addcontentsline{toc}{chapter}{Appendix B: Publication Details}
+\include{appendixB}
+
+
+\end{document}
+
+

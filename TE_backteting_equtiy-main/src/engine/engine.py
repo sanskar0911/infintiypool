@@ -110,6 +110,7 @@ class BacktestEngine:
                     txn_cost = cost_info["total_cost"]
 
                     fill_qty = order.quantity
+                    net_value = 0.0
 
                     # Apply cash constraints for BUY orders
                     if order.is_buy():
@@ -126,7 +127,7 @@ class BacktestEngine:
                             else:  # REDUCE_QUANTITY
                                 # Adjust quantity to affordable amount
                                 cost_per_share = fill_price * (1.0 + self.config.commission_bps / 10000.0)
-                                fill_qty = int(math.floor(portfolio_mgr.cash / cost_per_share))
+                                fill_qty = math.floor(portfolio_mgr.cash / cost_per_share)
                                 if fill_qty <= 0:
                                     order.status = OrderStatus.REJECTED
                                     execution_trace.append(
