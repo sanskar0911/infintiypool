@@ -10,3 +10,5 @@ ENV/
 *.log
 logs/*.log
 .DS_Store
+test_output/
+results/test_output/

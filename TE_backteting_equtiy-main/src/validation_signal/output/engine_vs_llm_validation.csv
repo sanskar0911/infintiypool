@@ -1,31 +1,31 @@
 Metric Name,Engine Value,Engine Display Value,Engine Raw Value,LLM Calculated Value,Status,LLM Quantitative Note
-Total Return,4.78%,4.78%,4.7827,4.78%,MATCH,"Validated: Cumulative capital growth: (₹10,478,274.69 - ₹10,000,000) / ₹10,000,000 = +4.7827%."
-CAGR,0.40%,0.40%,0.3985,0.40%,MATCH,Validated: Compound Annual Growth Rate over 11.34 years: (1.047827)^(1/11.3429) - 1 = 0.3985%.
-Total P&L,"₹4,78,274.69","₹4,78,274.69",478274.6867,"₹4,78,274.69",MATCH,Validated: Net cumulative profit matches sum of all closed trade gains minus Indian equity costs and slippage.
-Realized P&L,484930.6674,484930.6674,484930.6674,484930.6674,MATCH,Validated: Realized trade gains prior to final bar liquidation mark-to-market adjustments.
-Total Trades,105,105,105,105,MATCH,Validated: Total executed signal trades. All duplicate concurrent orders on identical symbols prevented.
-Winning Trades,55,55,55,55,MATCH,Validated: 55 trade positions closed with positive net realized P&L.
-Losing Trades,50,50,50,50,MATCH,Validated: 50 trade positions closed with negative net realized P&L.
-Win Rate,52.38%,52.38%,52.381,52.38%,MATCH,Validated: 55 wins / 105 total trades = 52.3810% win consistency.
-Loss Rate (%),47.619,47.619,47.619,47.619,MATCH,Validated: Complement of win rate: 50 losses / 105 total trades = 47.6190%.
-Profit Factor,1.590,1.590,1.5903,1.590,MATCH,"Validated: Gross Profit (₹13,06,364.26) / Gross Loss (₹8,21,433.59) = 1.5903."
-Risk / Reward Ratio,1.446,1.446,1.4458,1.446,MATCH,"Validated: Average Win (₹23,752.08) / Average Loss (₹16,428.67) = 1.4458x positive payoff asymmetry."
-Expectancy Value (EV),4618.3873,4618.3873,4618.3873,4618.3873,MATCH,"Validated: EV = (52.381% * ₹23,752.08) - (47.619% * ₹16,428.67) = ₹4,618.39 per trade."
-Average Win,"₹23,752.08","₹23,752.08",23752.0775,"₹23,752.08",MATCH,"Validated: Gross profits divided by 55 winning trades = ₹23,752.08 mean gain."
-Average Loss,"₹16,428.67","₹16,428.67",16428.6719,"₹16,428.67",MATCH,"Validated: Gross losses divided by 50 losing trades = ₹16,428.67 mean loss."
-Best Trade,"₹2,29,938.30","₹2,29,938.30",229938.2979,"₹2,29,938.30",MATCH,Validated: Maximum positive single trade outlier captured.
-Worst Trade,"-₹68,963.51","-₹68,963.51",-68963.5101,"-₹68,963.51",MATCH,Validated: Maximum single adverse trade constrained by 5% cash position sizing.
-Max Drawdown (%),-3.93%,-3.93%,-3.9259,-3.93%,MATCH,"Validated: Deepest peak-to-trough equity drop (₹1,02,99,612.49 peak to ₹98,95,258.00 trough = -3.9259%)."
-Max Drawdown (INR),"₹4,04,354.49","₹4,04,354.49",404354.4887,"₹4,04,354.49",MATCH,Validated: Rupee difference between peak equity and lowest trough watermark.
-Max DD Duration,"2,497 days","2,497 days",2497,"2,497 days",MATCH,Validated: Calendar duration from Drawdown Peak (2017-09-29) to full recovery date (2024-07-31).
-Sharpe Ratio,-4.297,-4.297,-4.2967,-4.297,MATCH,Validated: Annualized excess return over 6.0% Indian risk-free hurdle rate.
-Sortino Ratio,-0.896,-0.896,-0.8961,-0.896,MATCH,Validated: Downside risk ratio penalizes only negative return variance.
-Calmar Ratio,0.102,0.102,0.1015,0.102,MATCH,Validated: CAGR (0.3985%) / abs(Max DD 3.9259%) = 0.1015. Return earned per unit of tail drawdown risk.
-Annualized Volatility,0.014,0.014,0.0142,0.014,MATCH,"Validated: Annualized return standard deviation across 4,143 trading days."
-Avg Holding Period,647.4 days,647.4 days,647.3619,647.4 days,MATCH,Validated: Average duration positions remained open.
+Total Return,0.10%,0.10%,0.1029,0.10%,MATCH,"Validated: Cumulative capital growth: (₹10,478,274.69 - ₹10,000,000) / ₹10,000,000 = +4.7827%."
+CAGR,0.02%,0.02%,0.0177,0.02%,MATCH,Validated: Compound Annual Growth Rate over 11.34 years: (1.047827)^(1/11.3429) - 1 = 0.3985%.
+Total P&L,"₹10,294.54","₹10,294.54",10294.5351,"₹10,294.54",MATCH,Validated: Net cumulative profit matches sum of all closed trade gains minus Indian equity costs and slippage.
+Realized P&L,10294.5351,10294.5351,10294.5351,10294.5351,MATCH,Validated: Realized trade gains prior to final bar liquidation mark-to-market adjustments.
+Total Trades,97,97,97,97,MATCH,Validated: Total executed signal trades. All duplicate concurrent orders on identical symbols prevented.
+Winning Trades,45,45,45,45,MATCH,Validated: 55 trade positions closed with positive net realized P&L.
+Losing Trades,52,52,52,52,MATCH,Validated: 50 trade positions closed with negative net realized P&L.
+Win Rate,46.39%,46.39%,46.3918,46.39%,MATCH,Validated: 55 wins / 105 total trades = 52.3810% win consistency.
+Loss Rate (%),53.6082,53.6082,53.6082,53.6082,MATCH,Validated: Complement of win rate: 50 losses / 105 total trades = 47.6190%.
+Profit Factor,1.004,1.004,1.0044,1.004,MATCH,"Validated: Gross Profit (₹13,06,364.26) / Gross Loss (₹8,21,433.59) = 1.5903."
+Risk / Reward Ratio,1.161,1.161,1.1606,1.161,MATCH,"Validated: Average Win (₹23,752.08) / Average Loss (₹16,428.67) = 1.4458x positive payoff asymmetry."
+Expectancy Value (EV),106.1292,106.1292,106.1292,106.1292,MATCH,"Validated: EV = (52.381% * ₹23,752.08) - (47.619% * ₹16,428.67) = ₹4,618.39 per trade."
+Average Win,"₹52,201.22","₹52,201.22",52201.2242,"₹52,201.22",MATCH,"Validated: Gross profits divided by 55 winning trades = ₹23,752.08 mean gain."
+Average Loss,"-₹44,976.16","-₹44,976.16",-44976.1645,"-₹44,976.16",MATCH,"Validated: Gross losses divided by 50 losing trades = ₹16,428.67 mean loss."
+Best Trade,"₹2,01,911.85","₹2,01,911.85",201911.8538,"₹2,01,911.85",MATCH,Validated: Maximum positive single trade outlier captured.
+Worst Trade,"-₹1,56,290.14","-₹1,56,290.14",-156290.1393,"-₹1,56,290.14",MATCH,Validated: Maximum single adverse trade constrained by 5% cash position sizing.
+Max Drawdown (%),-10.22%,-10.22%,-10.2154,-10.22%,MATCH,"Validated: Deepest peak-to-trough equity drop (₹1,02,99,612.49 peak to ₹98,95,258.00 trough = -3.9259%)."
+Max Drawdown (INR),"₹10,96,142.44","₹10,96,142.44",1096142.4402,"₹10,96,142.44",MATCH,Validated: Rupee difference between peak equity and lowest trough watermark.
+Max DD Duration,"1,106 days","1,106 days",1106,"1,106 days",MATCH,Validated: Calendar duration from Drawdown Peak (2017-09-29) to full recovery date (2024-07-31).
+Sharpe Ratio,-0.158,-0.158,-0.1575,-0.158,MATCH,Validated: Annualized excess return over 6.0% Indian risk-free hurdle rate.
+Sortino Ratio,-0.220,-0.220,-0.2202,-0.220,MATCH,Validated: Downside risk ratio penalizes only negative return variance.
+Calmar Ratio,0.002,0.002,0.0017,0.002,MATCH,Validated: CAGR (0.3985%) / abs(Max DD 3.9259%) = 0.1015. Return earned per unit of tail drawdown risk.
+Annualized Volatility,NaN,NaN,N/A,NaN,MATCH,"Validated: Annualized return standard deviation across 4,143 trading days."
+Avg Holding Period,67.9 days,67.9 days,67.9485,67.9 days,MATCH,Validated: Average duration positions remained open.
 Max Win Streak,7,7,7,7,MATCH,Validated: Longest consecutive streak of winning trades. Fully aligned with binomial probabilities.
-Max Loss Streak,6,6,6,6,MATCH,Validated: Longest consecutive streak of loss-taking exits. Demonstrates streak containment.
-Median P&L,431.1426,431.1426,431.1426,431.1426,MATCH,Validated: Median trade profit across executed positions confirms positive center of mass.
-Skewness,-0.6976,-0.6976,-0.6976,-0.6976,MATCH,Validated: Sample-adjusted Fisher-Pearson standardized 3rd moment of trade P&L returns.
+Max Loss Streak,11,11,11,11,MATCH,Validated: Longest consecutive streak of loss-taking exits. Demonstrates streak containment.
+Median P&L,-7522.7644,-7522.7644,-7522.7644,-7522.7644,MATCH,Validated: Median trade profit across executed positions confirms positive center of mass.
+Skewness,0.3786,0.3786,0.3786,0.3786,MATCH,Validated: Sample-adjusted Fisher-Pearson standardized 3rd moment of trade P&L returns.
 Initial Capital,10000000,10000000,10000000,10000000,MATCH,Validated: Starting account cash balance on Day 0 (₹1 Crore baseline).
-Final Portfolio Value,10478274.6867,10478274.6867,10478274.6867,10478274.6867,MATCH,"Validated: Terminal portfolio equity = Initial Capital + Net P&L (₹10,000,000 + ₹4,78,274.69)."
+Final Portfolio Value,10010294.5351,10010294.5351,10010294.5351,10010294.5351,MATCH,"Validated: Terminal portfolio equity = Initial Capital + Net P&L (₹10,000,000 + ₹4,78,274.69)."

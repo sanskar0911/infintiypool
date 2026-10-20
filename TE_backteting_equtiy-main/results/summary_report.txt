@@ -9,7 +9,7 @@ Stock Ticker / Universe: INFY
 Hypothesis            : Quantitative momentum / trend following strategy
 Date Range            : 2020-01-01 to 2024-12-31
 Initial Capital        : INR 100,000.00
-Final Portfolio Value  : INR 119,314.77
+Final Portfolio Value  : INR 99,635.13
 
 2. EXECUTION & PORTFOLIO RULES
 --------------------------------------------------------------------------------
@@ -18,32 +18,32 @@ Maximum Position Cap  : 10 simultaneous positions
 Rebalancing Frequency : Daily
 Transaction Cost Rate : 0.10% (0.1% per trade)
 Execution Slippage    : 0.05% (0.05% per trade)
-Stop Loss / Take Profit: SL None% | TP None%
+Stop Loss / Take Profit: SL 5.0% | TP 10.0%
 
 3. PERFORMANCE & RETURN METRICS
 --------------------------------------------------------------------------------
-Total Return          : 19.31%
-CAGR (Compound Ann)   : 3.60%
+Total Return          : -0.36%
+CAGR (Compound Ann)   : -0.07%
 Annualized Volatility : 0.00%
-Sharpe Ratio (Rf=0)   : 0.6159
-Sortino Ratio (Rf=0)  : 0.9106
-Maximum Drawdown (MDD): -8.24%
+Sharpe Ratio (Rf=0)   : 0.0069
+Sortino Ratio (Rf=0)  : 0.0099
+Maximum Drawdown (MDD): -3.21%
 
 4. TRADING & EXPOSURE STATISTICS
 --------------------------------------------------------------------------------
 Total Executed Trades : 0
-Trade Win Rate        : 45.45%
+Trade Win Rate        : 36.36%
 Annual Portfolio Turnover: 0.00%
-Market Time Exposure  : 13.39%
+Market Time Exposure  : 0.16%
 
 5. BENCHMARK COMPARISON (NIFTY50)
 --------------------------------------------------------------------------------
-Strategy CAGR vs Benchmark: 3.60% vs 16.10%
-Excess Annual Return   : -12.50%
-Strategy Sharpe vs Bench  : 0.62 vs 0.84
-Portfolio Beta        : 0.09
-Correlation with Bench: 0.30
-Information Ratio     : -0.64
+Strategy CAGR vs Benchmark: -0.07% vs 16.10%
+Excess Annual Return   : -16.17%
+Strategy Sharpe vs Bench  : 0.01 vs 0.84
+Portfolio Beta        : 0.00
+Correlation with Bench: 0.01
+Information Ratio     : -0.77
 
 6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS
 --------------------------------------------------------------------------------

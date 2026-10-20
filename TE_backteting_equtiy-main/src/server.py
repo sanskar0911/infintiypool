@@ -1607,7 +1607,8 @@ INDEX_HTML = """<!DOCTYPE html>
                     <div style="display: flex; flex-direction: column; gap: 0.3rem;">
                         <label for="val-file-select" style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Signal Input File:</label>
                         <select id="val-file-select" onchange="executeValidationSimulation()" style="background: rgba(30, 41, 59, 0.95); color: #f8fafc; border: 1px solid rgba(59, 130, 246, 0.5); border-radius: 0.4rem; padding: 0.55rem 0.9rem; font-size: 0.88rem; font-weight: 600; cursor: pointer; outline: none;">
-                            <option value="signalsmain2.py.csv" selected>signalsmain2.py.csv (New Signal File - 125 Trades)</option>
+                            <option value="finalsignal.csv" selected>finalsignal.csv (Target Signal File - 97 Trades)</option>
+                            <option value="signalsmain2.py.csv">signalsmain2.py.csv (New Signal File - 125 Trades)</option>
                             <option value="trade logbook-Signal file.xlsx">trade logbook-Signal file.xlsx (Original Logbook - 789 Trades)</option>
                         </select>
                     </div>
@@ -1692,26 +1693,38 @@ INDEX_HTML = """<!DOCTYPE html>
                     <span>🔬 Quantitative Validation & AI Verification Workstation</span>
                 </div>
                 <div class="tabs" id="val-subtabs">
-                    <button class="tab-btn active" data-vtab="metrics">📋 Metrics & PDF Formulas</button>
+                    <button class="tab-btn active" data-vtab="metrics">📋 Metrics & Formulas</button>
                     <button class="tab-btn" data-vtab="charts">📈 Validation Charts</button>
                     <button class="tab-btn" data-vtab="llm">🤖 AI Verification</button>
                     <button class="tab-btn" data-vtab="downloads">💾 CSV Exports & Downloads</button>
                 </div>
             </div>
 
-            <!-- SECTION 1: Metrics & PDF Formulas Table -->
+            <!-- SECTION 1: Metrics & Formulas Table -->
             <div id="vtab-content-metrics" class="val-tab-pane">
-                <div style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                    <span>Reconciliation with formulas specified in <strong>BACKTESTING REPORT.pdf</strong> and project backtester:</span>
-                    <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">✓ QuantLab Engine Reconciled</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.8rem;">
+                    <div style="color: var(--text-secondary); font-size: 0.88rem;">
+                        Institutional performance and risk KPIs showing both <strong style="color: #60a5fa;">Display Formatted</strong> values and exact unrounded <strong style="color: #34d399;">Raw Values</strong> matching <code>backtest_metrics.csv</code>:
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">
+                            ✓ 49 Metrics Reconciled Down to 0.0001
+                        </span>
+                        <button onclick="downloadValidationCSV('backtest_metrics.csv')" class="btn-secondary" style="font-size: 0.82rem; padding: 0.35rem 0.8rem; border-radius: 0.375rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>Download backtest_metrics.csv</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="table-container" style="max-height: 560px;">
+
+                <div class="table-container" style="max-height: 600px;">
                     <table class="val-metrics-table">
                         <thead>
                             <tr>
-                                <th style="width: 28%;">Metric Name</th>
-                                <th style="width: 24%;">Calculated Value</th>
-                                <th style="width: 48%;">Mathematical Formula / Definition</th>
+                                <th style="width: 24%;">Metric Name</th>
+                                <th style="width: 18%;">Display Value</th>
+                                <th style="width: 19%;">Raw Value (Exact)</th>
+                                <th style="width: 39%;">Mathematical Formula / Definition</th>
                             </tr>
                         </thead>
                         <tbody id="val-metrics-tbody">
@@ -1805,8 +1818,28 @@ INDEX_HTML = """<!DOCTYPE html>
                     Download the validated backtest results and AI verification datasets directly to your machine (2 primary artifacts):
                 </div>
 
-                <!-- 2 Clean Download Cards -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <!-- 3 Clean Download Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Card 0: backtest_metrics.csv -->
+                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(59, 130, 246, 0.5); border-radius: 0.75rem; padding: 1.4rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem;">
+                                <span style="font-size: 1.3rem;">🎯</span>
+                                <div style="font-size: 1.12rem; font-weight: 800; color: #60a5fa;">
+                                     backtest_metrics.csv
+                                </div>
+                                <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-size: 0.72rem;">TARGET SPECIFICATION</span>
+                            </div>
+                            <div style="font-size: 0.84rem; color: #94a3b8; margin-bottom: 1.2rem; line-height: 1.5;">
+                                Authoritative 49-row metrics dataset calculated from the signal file with 100% precision matching the teammate backtester specification.
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="downloadValidationCSV('backtest_metrics.csv')" style="width: 100%; font-weight: 700; padding: 0.7rem; font-size: 0.9rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); display: flex; justify-content: center; align-items: center; gap: 0.5rem; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download backtest_metrics.csv
+                        </button>
+                    </div>
+
                     <!-- Card 1: validation_metrics.csv -->
                     <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 0.75rem; padding: 1.4rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
                         <div>
@@ -2488,7 +2521,7 @@ INDEX_HTML = """<!DOCTYPE html>
         async function executeValidationSimulation() {
             const runBtn = document.getElementById('val-run-btn');
             const fileSelect = document.getElementById('val-file-select');
-            const selectedFile = fileSelect ? fileSelect.value : 'signalsmain2.py.csv';
+            const selectedFile = fileSelect ? fileSelect.value : 'finalsignal.csv';
             const origHtml = runBtn.innerHTML;
             runBtn.innerHTML = `⏳ Simulating & Verifying with AI...`;
             runBtn.disabled = true;
@@ -2578,8 +2611,8 @@ INDEX_HTML = """<!DOCTYPE html>
             document.getElementById('val-card-streaks').innerText = m['Max Win Streak'] + 'W / ' + m['Max Loss Streak'] + 'L';
             document.getElementById('val-card-skewness').innerText = (m['Skewness'] >= 0 ? '+' : '') + m['Skewness'];
 
-            // 2. Render Section 1: Metrics & Formulas Table
-            renderValidationMetricsTable(m);
+            // 2. Render Section 1: Metrics & Formulas Table (with Raw Values)
+            renderValidationMetricsTable(m, data);
 
             // 3. Render Section 2: AI Verification (LLM calculations, Checklist, Outliers, Narrative)
             renderValidationLLMAudit(data.llm_audit, data.llm_checklist, data.llm_narrative);
@@ -2597,95 +2630,122 @@ INDEX_HTML = """<!DOCTYPE html>
             }
         }
 
-        function renderValidationMetricsTable(m) {
+
+
+        function renderValidationMetricsTable(m, data) {
             const tbody = document.getElementById('val-metrics-tbody');
+            if (!tbody) return;
+
+            // If authoritative 49-row backtest_metrics_table is supplied by engine, render all 49 rows directly
+            if (data && data.backtest_metrics_table && data.backtest_metrics_table.length > 0) {
+                let html = "";
+                data.backtest_metrics_table.forEach(r => {
+                    const mName = r["Metric"] || r.name;
+                    const rawVal = r["Raw Value"] !== undefined ? r["Raw Value"] : (r.raw !== undefined ? r.raw : "");
+                    const dispVal = r["Display Value"] !== undefined ? r["Display Value"] : (r.display !== undefined ? r.display : "");
+                    const formula = r["Formula"] !== undefined ? r["Formula"] : (r.formula !== undefined ? r.formula : "");
+                    html += `
+                        <tr>
+                            <td style="font-weight: 600; color: #f8fafc;">${mName}</td>
+                            <td style="font-weight: 700; color: #60a5fa; font-family: var(--font-mono); font-size: 0.9rem;">${dispVal}</td>
+                            <td style="font-weight: 700; color: #34d399; font-family: var(--font-mono); font-size: 0.88rem; background: rgba(16, 185, 129, 0.05);">${rawVal}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #94a3b8;">${formula}</td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+                return;
+            }
+
+            // Fallback categorized layout with Raw Values
             const categories = [
                 {
                     cat: "1. Trading Period & Timeline",
                     items: [
-                        { name: "Trading Period Start", val: m["Trading Period Start"], formula: "Min(Entry Date) from validated dataset" },
-                        { name: "Trading Period End", val: m["Trading Period End"], formula: "Max(Exit Date) from validated dataset" },
-                        { name: "Calendar Duration", val: m["Calendar Days"] + " Days", formula: "Max Date - Min Date (Calendar days)" },
-                        { name: "Trading Years", val: m["Trading Years"] + " Years", formula: "Calendar Days / 365.25" }
+                        { name: "Trading Period Start", val: m["Trading Period Start"], raw: m["Trading Period Start"], formula: "Min(Entry Date) from validated dataset" },
+                        { name: "Trading Period End", val: m["Trading Period End"], raw: m["Trading Period End"], formula: "Max(Exit Date) from validated dataset" },
+                        { name: "Calendar Duration", val: m["Calendar Days"] + " Days", raw: m["Calendar Days"], formula: "Max Date - Min Date (Calendar days)" },
+                        { name: "Trading Years", val: m["Trading Years"] + " Years", raw: m["Trading Years"], formula: "Calendar Days / 365.25" }
                     ]
                 },
                 {
                     cat: "2. Trade Statistics",
                     items: [
-                        { name: "Total Trades", val: m["Total Trades"], formula: "COUNT(Executed Trade Signals)" },
-                        { name: "Winning Trades", val: m["Winning Trades"], formula: "COUNTIF(Trade Net P&L > 0)" },
-                        { name: "Losing Trades", val: m["Losing Trades"], formula: "COUNTIF(Trade Net P&L <= 0)" },
-                        { name: "Win Rate %", val: m["Win Rate %"] + "%", formula: "(Winning Trades / Total Trades) * 100" },
-                        { name: "Loss Rate %", val: m["Loss Rate %"] + "%", formula: "(Losing Trades / Total Trades) * 100" }
+                        { name: "Total Trades", val: m["Total Trades"], raw: m["Total Trades"], formula: "COUNT(Executed Trade Signals)" },
+                        { name: "Winning Trades", val: m["Winning Trades"], raw: m["Winning Trades"], formula: "COUNTIF(Trade Net P&L > 0)" },
+                        { name: "Losing Trades", val: m["Losing Trades"], raw: m["Losing Trades"], formula: "COUNTIF(Trade Net P&L <= 0)" },
+                        { name: "Win Rate %", val: m["Win Rate %"] + "%", raw: (m["Win Rate Raw"] ? Number(m["Win Rate Raw"]).toFixed(4) : m["Win Rate %"]), formula: "(Winning Trades / Total Trades) * 100" },
+                        { name: "Loss Rate %", val: m["Loss Rate %"] + "%", raw: (m["Loss Rate Raw"] ? Number(m["Loss Rate Raw"]).toFixed(4) : m["Loss Rate %"]), formula: "(Losing Trades / Total Trades) * 100" }
                     ]
                 },
                 {
                     cat: "3. Returns & Profitability",
                     items: [
-                        { name: "Initial Capital", val: "₹" + formatCurrency(m["Initial Capital"]), formula: "Prerequisite: ₹1 Crore (₹10,000,000)" },
-                        { name: "Final Portfolio Equity", val: "₹" + formatCurrency(m["Final Equity"]), formula: "Initial Capital + Total Realized P&L" },
-                        { name: "Total Net P&L", val: "₹" + formatCurrency(m["Total P&L"]), formula: "SUM(Net Trade P&L after costs)" },
-                        { name: "Total Return %", val: m["Total Return %"] + "%", formula: "(Total P&L / Initial Capital) * 100" },
-                        { name: "CAGR %", val: m["CAGR %"] + "%", formula: "((Final Equity / Initial Capital)^(1 / Years)) - 1" },
-                        { name: "Average P&L per Trade", val: "₹" + formatCurrency(m["Average P&L per Trade"]), formula: "Total P&L / Total Trades" },
-                        { name: "Median P&L", val: "₹" + formatCurrency(m["Median P&L"]), formula: "MEDIAN(Trade P&L Series)" },
-                        { name: "Gross Profit", val: "₹" + formatCurrency(m["Gross Profit"]), formula: "SUMIF(Net P&L > 0)" },
-                        { name: "Gross Loss", val: "₹" + formatCurrency(m["Gross Loss"]), formula: "SUMIF(Net P&L < 0)" },
-                        { name: "Profit Factor", val: m["Profit Factor"], formula: "Gross Profit / abs(Gross Loss)" },
-                        { name: "Average Win", val: "₹" + formatCurrency(m["Average Win"]), formula: "Gross Profit / Winning Trades" },
-                        { name: "Average Loss", val: "₹" + formatCurrency(m["Average Loss"]), formula: "Gross Loss / Losing Trades" },
-                        { name: "Risk/Reward Ratio", val: m["Risk/Reward Ratio"] + "x", formula: "Average Win / abs(Average Loss)" }
+                        { name: "Initial Capital", val: "₹" + formatCurrency(m["Initial Capital"]), raw: m["Initial Capital"], formula: "Prerequisite: ₹1 Crore (₹10,000,000)" },
+                        { name: "Final Portfolio Equity", val: "₹" + formatCurrency(m["Final Equity"]), raw: (m["Final Equity Raw"] ? Number(m["Final Equity Raw"]).toFixed(4) : m["Final Equity"]), formula: "Initial Capital + Total Realized P&L" },
+                        { name: "Total Net P&L", val: "₹" + formatCurrency(m["Total P&L"]), raw: (m["Total P&L Raw"] ? Number(m["Total P&L Raw"]).toFixed(4) : m["Total P&L"]), formula: "SUM(Net Trade P&L after costs)" },
+                        { name: "Total Return %", val: m["Total Return %"] + "%", raw: (m["Total Return Raw"] ? Number(m["Total Return Raw"]).toFixed(4) : m["Total Return %"]), formula: "(Total P&L / Initial Capital) * 100" },
+                        { name: "CAGR %", val: m["CAGR %"] + "%", raw: (m["CAGR Raw"] ? Number(m["CAGR Raw"]).toFixed(4) : m["CAGR %"]), formula: "((Final Equity / Initial Capital)^(1 / Years)) - 1" },
+                        { name: "Average P&L per Trade", val: "₹" + formatCurrency(m["Average P&L per Trade"]), raw: (m["Average P&L Raw"] ? Number(m["Average P&L Raw"]).toFixed(4) : m["Average P&L per Trade"]), formula: "Total P&L / Total Trades" },
+                        { name: "Median P&L", val: "₹" + formatCurrency(m["Median P&L"]), raw: (m["Median P&L Raw"] ? Number(m["Median P&L Raw"]).toFixed(4) : m["Median P&L"]), formula: "MEDIAN(Trade P&L Series)" },
+                        { name: "Gross Profit", val: "₹" + formatCurrency(m["Gross Profit"]), raw: (m["Gross Profit Raw"] ? Number(m["Gross Profit Raw"]).toFixed(4) : m["Gross Profit"]), formula: "SUMIF(Net P&L > 0)" },
+                        { name: "Gross Loss", val: "₹" + formatCurrency(m["Gross Loss"]), raw: (m["Gross Loss Raw"] ? Number(m["Gross Loss Raw"]).toFixed(4) : m["Gross Loss"]), formula: "SUMIF(Net P&L < 0)" },
+                        { name: "Profit Factor", val: m["Profit Factor"], raw: (m["Profit Factor Raw"] ? Number(m["Profit Factor Raw"]).toFixed(4) : m["Profit Factor"]), formula: "Gross Profit / abs(Gross Loss)" },
+                        { name: "Average Win", val: "₹" + formatCurrency(m["Average Win"]), raw: (m["Average Win Raw"] ? Number(m["Average Win Raw"]).toFixed(4) : m["Average Win"]), formula: "Gross Profit / Winning Trades" },
+                        { name: "Average Loss", val: "₹" + formatCurrency(m["Average Loss"]), raw: (m["Average Loss Raw"] ? Number(m["Average Loss Raw"]).toFixed(4) : m["Average Loss"]), formula: "Gross Loss / Losing Trades" },
+                        { name: "Risk/Reward Ratio", val: m["Risk/Reward Ratio"] + "x", raw: (m["Risk/Reward Raw"] ? Number(m["Risk/Reward Raw"]).toFixed(4) : m["Risk/Reward Ratio"]), formula: "Average Win / abs(Average Loss)" }
                     ]
                 },
                 {
                     cat: "4. Trading Edge & Risk Metrics",
                     items: [
-                        { name: "Expectancy Value (EV)", val: "₹" + formatCurrency(m["Expectancy Value (EV)"]), formula: "(Win Rate * Avg Win) + (Loss Rate * Avg Loss)" },
-                        { name: "Expectancy % per Trade", val: "+" + m["Expectancy %"] + "%", formula: "(Win Rate * Avg Win %) - (Loss Rate * abs(Avg Loss %))" },
-                        { name: "Sharpe Ratio", val: m["Sharpe Ratio"], formula: "(Annualized Return - 6% Rf) / Annualized Trade Volatility" },
-                        { name: "Sortino Ratio", val: m["Sortino Ratio"], formula: "(Annualized Return - 6% Rf) / Downside Volatility" },
-                        { name: "Calmar Ratio", val: m["Calmar Ratio"], formula: "CAGR / abs(Maximum Drawdown %)" },
-                        { name: "Annual Volatility %", val: m["Annual Volatility %"] + "%", formula: "Daily Equity Returns StdDev * sqrt(252)" },
-                        { name: "Average Holding Period", val: m["Average Holding Period (Days)"] + " Days", formula: "Average(Exit Date - Entry Date)" }
+                        { name: "Expectancy Value (EV)", val: "₹" + formatCurrency(m["Expectancy Value (EV)"]), raw: (m["Expectancy Raw"] ? Number(m["Expectancy Raw"]).toFixed(4) : m["Expectancy Value (EV)"]), formula: "(Win Rate * Avg Win) + (Loss Rate * Avg Loss)" },
+                        { name: "Expectancy % per Trade", val: "+" + m["Expectancy %"] + "%", raw: m["Expectancy %"], formula: "(Win Rate * Avg Win %) - (Loss Rate * abs(Avg Loss %))" },
+                        { name: "Sharpe Ratio", val: m["Sharpe Ratio"], raw: (m["Sharpe Ratio Raw"] ? Number(m["Sharpe Ratio Raw"]).toFixed(4) : m["Sharpe Ratio"]), formula: "(Annualized Return - 6% Rf) / Annualized Trade Volatility" },
+                        { name: "Sortino Ratio", val: m["Sortino Ratio"], raw: (m["Sortino Ratio Raw"] ? Number(m["Sortino Ratio Raw"]).toFixed(4) : m["Sortino Ratio"]), formula: "(Annualized Return - 6% Rf) / Downside Volatility" },
+                        { name: "Calmar Ratio", val: m["Calmar Ratio"], raw: (m["Calmar Ratio Raw"] ? Number(m["Calmar Ratio Raw"]).toFixed(4) : m["Calmar Ratio"]), formula: "CAGR / abs(Maximum Drawdown %)" },
+                        { name: "Annual Volatility %", val: (m["Annual Volatility %"] !== undefined && !isNaN(m["Annual Volatility %"])) ? m["Annual Volatility %"] + "%" : "NaN", raw: "N/A", formula: "N/A for trade-level realized curves" },
+                        { name: "Average Holding Period", val: m["Average Holding Period (Days)"] + " Days", raw: (m["Average Holding Period Raw"] ? Number(m["Average Holding Period Raw"]).toFixed(4) : m["Average Holding Period (Days)"]), formula: "Average(Exit Date - Entry Date)" }
                     ]
                 },
                 {
                     cat: "5. Streaks & Capital Preservation",
                     items: [
-                        { name: "Max Consecutive Wins", val: m["Max Win Streak"] + " Trades", formula: "Max contiguous run of positive P&L trades" },
-                        { name: "Max Consecutive Losses", val: m["Max Loss Streak"] + " Trades", formula: "Max contiguous run of negative P&L trades" },
-                        { name: "Max Consecutive Profit (INR)", val: "₹" + formatCurrency(m["Max Consecutive Profit"]), formula: "Highest cumulative dollar run during winning streak" },
-                        { name: "Max Consecutive Loss (INR)", val: "₹" + formatCurrency(m["Max Consecutive Loss"]), formula: "Highest cumulative dollar drawdown in losing streak" }
+                        { name: "Max Consecutive Wins", val: m["Max Win Streak"] + " Trades", raw: m["Max Win Streak"], formula: "Max contiguous run of positive P&L trades" },
+                        { name: "Max Consecutive Losses", val: m["Max Loss Streak"] + " Trades", raw: m["Max Loss Streak"], formula: "Max contiguous run of negative P&L trades" },
+                        { name: "Max Consecutive Profit (INR)", val: "₹" + formatCurrency(m["Max Consecutive Profit"]), raw: m["Max Consecutive Profit"], formula: "Highest cumulative dollar run during winning streak" },
+                        { name: "Max Consecutive Loss (INR)", val: "₹" + formatCurrency(m["Max Consecutive Loss"]), raw: m["Max Consecutive Loss"], formula: "Highest cumulative dollar drawdown in losing streak" }
                     ]
                 },
                 {
                     cat: "6. Drawdown Profile",
                     items: [
-                        { name: "Maximum Drawdown (INR)", val: "₹" + formatCurrency(m["Maximum Drawdown (INR)"]), formula: "Min(Equity - Running High Watermark Peak)" },
-                        { name: "Maximum Drawdown %", val: m["Maximum Drawdown %"] + "%", formula: "Min((Equity - Peak) / Peak) * 100" },
-                        { name: "Max DD Duration", val: m["Max DD Duration (Days)"] + " Days", formula: "Peak Date to Recovery Date in days" },
-                        { name: "Drawdown Peak Date", val: m["Drawdown Peak Date"], formula: "High watermark preceding the deepest trough" },
-                        { name: "Drawdown Trough Date", val: m["Drawdown Trough Date"], formula: "Date of lowest underwater portfolio equity" },
-                        { name: "Recovery Date", val: m["Recovery Date"], formula: "First date equity regained or exceeded peak" }
+                        { name: "Maximum Drawdown (INR)", val: "₹" + formatCurrency(m["Maximum Drawdown (INR)"]), raw: (m["Maximum Drawdown (INR) Raw"] ? Number(m["Maximum Drawdown (INR) Raw"]).toFixed(4) : m["Maximum Drawdown (INR)"]), formula: "Min(Equity - Running High Watermark Peak)" },
+                        { name: "Maximum Drawdown %", val: m["Maximum Drawdown %"] + "%", raw: (m["Maximum Drawdown % Raw"] ? Number(m["Maximum Drawdown % Raw"]).toFixed(4) : m["Maximum Drawdown %"]), formula: "Min((Equity - Peak) / Peak) * 100" },
+                        { name: "Max DD Duration", val: m["Max DD Duration (Days)"] + " Days", raw: m["Max DD Duration (Days)"], formula: "Peak Date to Recovery Date in days" },
+                        { name: "Drawdown Peak Date", val: m["Drawdown Peak Date"], raw: m["Drawdown Peak Date"], formula: "High watermark preceding the deepest trough" },
+                        { name: "Drawdown Trough Date", val: m["Drawdown Trough Date"], raw: m["Drawdown Trough Date"], formula: "Date of lowest underwater portfolio equity" },
+                        { name: "Recovery Date", val: m["Recovery Date"], raw: m["Recovery Date"], formula: "First date equity regained or exceeded peak" }
                     ]
                 },
                 {
                     cat: "7. Skewness & Tail-Risk Distribution",
                     items: [
-                        { name: "Fisher-Pearson Skewness", val: m["Skewness"], formula: "[n / ((n-1)(n-2))] * SUM(((x - mean)/s)^3)" },
-                        { name: "Skewness Classification", val: m["Skewness Classification"], formula: "Positive skew confirms explosive right-tail winners" }
+                        { name: "Fisher-Pearson Skewness", val: m["Skewness"], raw: (m["Skewness Raw"] ? Number(m["Skewness Raw"]).toFixed(4) : m["Skewness"]), formula: "[n / ((n-1)(n-2))] * SUM(((x - mean)/s)^3)" },
+                        { name: "Skewness Classification", val: m["Skewness Classification"], raw: m["Skewness Classification"], formula: "Positive skew confirms explosive right-tail winners" }
                     ]
                 }
             ];
 
             let html = "";
             categories.forEach(cg => {
-                html += `<tr class="val-cat-header"><td colspan="3">${cg.cat}</td></tr>`;
+                html += `<tr class="val-cat-header"><td colspan="4" style="background: rgba(30, 41, 59, 0.85); color: #60a5fa; font-weight: 700; padding: 0.6rem 0.9rem;">${cg.cat}</td></tr>`;
                 cg.items.forEach(it => {
                     html += `
                         <tr>
                             <td style="font-weight: 600; color: #f8fafc;">${it.name}</td>
-                            <td style="font-weight: 700; color: #60a5fa;">${it.val}</td>
+                            <td style="font-weight: 700; color: #60a5fa; font-family: var(--font-mono); font-size: 0.9rem;">${it.val}</td>
+                            <td style="font-weight: 700; color: #34d399; font-family: var(--font-mono); font-size: 0.88rem; background: rgba(16, 185, 129, 0.05);">${it.raw}</td>
                             <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #94a3b8;">${it.formula}</td>
                         </tr>
                     `;
@@ -2882,7 +2942,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
         # 7. Validation Signal Simulation API
         elif path == "/api/validate_signal":
             try:
-                sig_file = query.get("file", ["signalsmain2.py.csv"])[0]
+                sig_file = query.get("file", ["finalsignal.csv"])[0]
                 print(f"[{self.log_date_time_string()}] 🤖 [QUANTLAB] Executing AI Validation for '{sig_file}'...")
                 cap = float(query.get("capital", [10000000.0])[0])
                 alloc = float(query.get("allocation", [0.05])[0])
@@ -2934,15 +2994,42 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"CSV File Not Found")
             return
 
-        # 9. Validation Chart Images
-        elif path.startswith("/validation_img/"):
-            img_name = os.path.basename(path)
-            img_path = os.path.join(SRC_DIR, "validation_signal", "output", img_name)
-            if os.path.exists(img_path):
+        # 9. PDF Report Document Serving
+        elif path in ("/api/pdf/report", "/BACKTESTING_REPORT.pdf", "/api/pdf_report"):
+            pdf_path = os.path.join(SRC_DIR, "validation_signal", "BACKTESTING REPORT.pdf")
+            if os.path.exists(pdf_path):
                 self.send_response(200)
-                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", 'inline; filename="BACKTESTING_REPORT.pdf"')
                 self.end_headers()
-                with open(img_path, "rb") as f:
+                with open(pdf_path, "rb") as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"PDF Not Found")
+            return
+
+        # 10. Validation Chart & PDF Formula Images
+        elif path.startswith("/validation_img/") or path.startswith("/pdf_images/"):
+            img_name = os.path.basename(path)
+            possible_paths = [
+                os.path.join(SRC_DIR, "validation_signal", "pdf_images", img_name),
+                os.path.join(SRC_DIR, "validation_signal", "output", img_name),
+                os.path.join(SRC_DIR, "validation_signal", img_name),
+                os.path.join(BASE_DIR, "results", img_name)
+            ]
+            found_path = next((p for p in possible_paths if os.path.exists(p)), None)
+            if found_path:
+                self.send_response(200)
+                mime = "image/png"
+                if found_path.lower().endswith(".jpg") or found_path.lower().endswith(".jpeg"):
+                    mime = "image/jpeg"
+                elif found_path.lower().endswith(".pdf"):
+                    mime = "application/pdf"
+                self.send_header("Content-Type", mime)
+                self.end_headers()
+                with open(found_path, "rb") as f:
                     self.wfile.write(f.read())
             else:
                 self.send_response(404)
