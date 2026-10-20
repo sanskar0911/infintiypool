@@ -5,45 +5,45 @@ FINAL STRATEGY FACT SHEET — SHANKH / DECUPLE INTERNSHIP 2026-27 (TE1)
 1. STRATEGY SPECIFICATIONS & METADATA
 --------------------------------------------------------------------------------
 Strategy Name         : SMA Crossover Strategy
-Stock Ticker / Universe: RELIANCE
+Stock Ticker / Universe: INFY
 Hypothesis            : Quantitative momentum / trend following strategy
 Date Range            : 2020-01-01 to 2024-12-31
-Initial Capital        : INR 10,000,000.00
-Final Portfolio Value  : INR 10,132,204.05
+Initial Capital        : INR 100,000.00
+Final Portfolio Value  : INR 117,865.52
 
 2. EXECUTION & PORTFOLIO RULES
 --------------------------------------------------------------------------------
-Position Allocation   : 5% max per trade
+Position Allocation   : 20% max per trade
 Maximum Position Cap  : 10 simultaneous positions
 Rebalancing Frequency : Daily
-Transaction Cost Rate : 0.03% (0.1% per trade)
+Transaction Cost Rate : 0.10% (0.1% per trade)
 Execution Slippage    : 0.05% (0.05% per trade)
 Stop Loss / Take Profit: SL None% | TP None%
 
 3. PERFORMANCE & RETURN METRICS
 --------------------------------------------------------------------------------
-Total Return          : 1.32%
-CAGR (Compound Ann)   : 0.26%
+Total Return          : 17.87%
+CAGR (Compound Ann)   : 3.34%
 Annualized Volatility : 0.00%
-Sharpe Ratio (Rf=0)   : 0.2652
-Sortino Ratio (Rf=0)  : 0.4007
-Maximum Drawdown (MDD): -3.12%
+Sharpe Ratio (Rf=0)   : 0.5697
+Sortino Ratio (Rf=0)  : 0.8484
+Maximum Drawdown (MDD): -8.39%
 
 4. TRADING & EXPOSURE STATISTICS
 --------------------------------------------------------------------------------
 Total Executed Trades : 0
-Trade Win Rate        : 31.25%
+Trade Win Rate        : 45.45%
 Annual Portfolio Turnover: 0.00%
-Market Time Exposure  : 2.74%
+Market Time Exposure  : 13.28%
 
 5. BENCHMARK COMPARISON (NIFTY50)
 --------------------------------------------------------------------------------
-Strategy CAGR vs Benchmark: 0.26% vs 16.10%
-Excess Annual Return   : -15.84%
-Strategy Sharpe vs Bench  : 0.27 vs 0.84
-Portfolio Beta        : 0.02
-Correlation with Bench: 0.31
-Information Ratio     : -0.78
+Strategy CAGR vs Benchmark: 3.34% vs 16.10%
+Excess Annual Return   : -12.76%
+Strategy Sharpe vs Bench  : 0.57 vs 0.84
+Portfolio Beta        : 0.08
+Correlation with Bench: 0.28
+Information Ratio     : -0.65
 
 6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS
 --------------------------------------------------------------------------------
