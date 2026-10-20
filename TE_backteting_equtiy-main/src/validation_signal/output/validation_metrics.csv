@@ -3,42 +3,46 @@ Trading Period Start,2013-03-28,Min(Entry Date) from validated signal dataset
 Trading Period End,2024-07-31,Max(Exit Date) from validated signal dataset
 Calendar Days,4143,Max Date - Min Date (Calendar days elapsed)
 Trading Years,11.34,Calendar Days / 365.25
-Total Trades,125,COUNT(Executed Trade Signals)
-Winning Trades,58,COUNTIF(Trade Net P&L > 0)
-Losing Trades,67,COUNTIF(Trade Net P&L <= 0)
-Win Rate %,46.4,(Winning Trades / Total Trades) * 100
-Loss Rate %,53.6,(Losing Trades / Total Trades) * 100
+Total Trades,105,COUNT(Executed Trade Signals)
+Winning Trades,55,COUNTIF(Trade Net P&L > 0)
+Losing Trades,50,COUNTIF(Trade Net P&L <= 0)
+Win Rate %,52.38,(Winning Trades / Total Trades) * 100
+Loss Rate %,47.62,(Losing Trades / Total Trades) * 100
 Initial Capital,10000000.0,"Fixed Base Capital: ₹1 Crore (₹10,000,000)"
-Final Equity,10903733.11,Initial Capital + Cumulative Realized Net P&L
-Total P&L,903733.11,SUM(Net Trade P&L after transaction costs)
-Realized P&L,903733.11,Quantitative calculation matching BACKTESTING REPORT.pdf specification
-Total Return %,9.04,(Total Net P&L / Initial Capital) * 100
-Average P&L per Trade,7229.86,Total Net P&L / Total Trades
-Median P&L,0.0,MEDIAN(Trade P&L Series)
-CAGR %,0.77,((Final Equity / Initial Capital) ^ (1 / Trading Years)) - 1
-Gross Profit,2105540.59,SUMIF(Net P&L > 0)
-Gross Loss,-1201807.48,SUMIF(Net P&L < 0)
-Profit Factor,1.75,Gross Profit / abs(Gross Loss)
-Average Win,36302.42,Gross Profit / Winning Trades
-Average Loss,-17937.43,Gross Loss / Losing Trades
-Risk/Reward Ratio,2.02,Average Win / abs(Average Loss)
-Expectancy Value (EV),7229.86,(Win Rate * Avg Win) + (Loss Rate * Avg Loss)
-Expectancy %,3.61,(Win Rate * Avg Win %) - (Loss Rate * abs(Avg Loss %))
-Sharpe Ratio,0.48,(Annualized Return - 6% Risk Free Rate) / Annualized Return Volatility
-Sortino Ratio,0.98,(Annualized Return - 6% Risk Free Rate) / Downside Volatility
-Calmar Ratio,0.26,CAGR % / abs(Maximum Drawdown %)
-Annual Volatility %,1.29,Daily Equity Returns StdDev * sqrt(252)
-Hit Ratio %,0.48,(Positive Return Trading Days / Total Days) * 100
-Average Holding Period (Days),74.9,Mean(Exit Date - Entry Date) across executed trades
-Max Win Streak,6,Longest consecutive sequence of profitable trades
-Max Loss Streak,5,Longest consecutive sequence of loss-taking trades
-Max Consecutive Profit,252878.46,Highest cumulative rupee gain during a winning streak
-Max Consecutive Loss,-239810.24,Highest cumulative rupee drawdown in a losing streak
-Maximum Drawdown (INR),-301816.69,Min(Daily Equity - Running Peak High Watermark)
-Maximum Drawdown %,-2.91,Min((Daily Equity - Running Peak) / Running Peak) * 100
-Max DD Duration (Days),1283,Calendar days from Drawdown Peak to full Recovery Date
-Drawdown Peak Date,2018-03-27,High watermark date preceding maximum drawdown
-Drawdown Trough Date,2020-03-31,Date of lowest underwater equity during max drawdown
-Recovery Date,2021-09-30,First date equity regained previous peak high watermark
-Skewness,1.853,Sample-adjusted Fisher-Pearson 3rd standardized moment of returns
-Skewness Classification,Positive Skew (Right-Tailed explosive gains),Distribution asymmetry characterization (e.g. Highly Positively Skewed)
+Final Equity,10478274.69,Initial Capital + Cumulative Realized Net P&L
+Total P&L,478274.69,SUM(Net Trade P&L after transaction costs)
+Realized P&L,484930.67,Quantitative calculation matching BACKTESTING REPORT.pdf specification
+Total Return %,4.78,(Total Net P&L / Initial Capital) * 100
+Average P&L per Trade,4618.39,Total Net P&L / Total Trades
+Median P&L,431.14,MEDIAN(Trade P&L Series)
+CAGR %,0.4,((Final Equity / Initial Capital) ^ (1 / Trading Years)) - 1
+Gross Profit,1306364.26,SUMIF(Net P&L > 0)
+Gross Loss,-821433.59,SUMIF(Net P&L < 0)
+Profit Factor,1.59,Gross Profit / abs(Gross Loss)
+Average Win,23752.08,Gross Profit / Winning Trades
+Average Loss,-16428.67,Gross Loss / Losing Trades
+Risk/Reward Ratio,1.446,Average Win / abs(Average Loss)
+Expectancy Value (EV),4618.39,(Win Rate * Avg Win) + (Loss Rate * Avg Loss)
+Expectancy %,1.25,(Win Rate * Avg Win %) - (Loss Rate * abs(Avg Loss %))
+Sharpe Ratio,-4.297,(Annualized Return - 6% Risk Free Rate) / Annualized Return Volatility
+Sortino Ratio,-0.896,(Annualized Return - 6% Risk Free Rate) / Downside Volatility
+Calmar Ratio,0.102,CAGR % / abs(Maximum Drawdown %)
+Annual Volatility %,1.42,Daily Equity Returns StdDev * sqrt(252)
+Hit Ratio %,0.46,(Positive Return Trading Days / Total Days) * 100
+Average Holding Period (Days),647.4,Mean(Exit Date - Entry Date) across executed trades
+Max Win Streak,7,Longest consecutive sequence of profitable trades
+Max Loss Streak,6,Longest consecutive sequence of loss-taking trades
+Max Consecutive Profit,641791.92,Highest cumulative rupee gain during a winning streak
+Max Consecutive Loss,-566117.25,Highest cumulative rupee drawdown in a losing streak
+Maximum Drawdown (INR),-404354.49,Min(Daily Equity - Running Peak High Watermark)
+Maximum Drawdown %,-3.93,Min((Daily Equity - Running Peak) / Running Peak) * 100
+Max DD Duration (Days),2497,Calendar days from Drawdown Peak to full Recovery Date
+Drawdown Peak Date,2017-09-29,High watermark date preceding maximum drawdown
+Drawdown Trough Date,2024-07-01,Date of lowest underwater equity during max drawdown
+Recovery Date,2024-07-31,First date equity regained previous peak high watermark
+Skewness,-0.6976,Sample-adjusted Fisher-Pearson 3rd standardized moment of returns
+Skewness Classification,Negative Skew (Managed left-tail risk with high win consistency),Distribution asymmetry characterization (e.g. Highly Positively Skewed)
+Drawdown Peak Equity,10299612.4913,Quantitative calculation matching BACKTESTING REPORT.pdf specification
+Drawdown Trough Equity,9895258.0026,Quantitative calculation matching BACKTESTING REPORT.pdf specification
+Best Trade,229938.3,Quantitative calculation matching BACKTESTING REPORT.pdf specification
+Worst Trade,-68963.51,Quantitative calculation matching BACKTESTING REPORT.pdf specification

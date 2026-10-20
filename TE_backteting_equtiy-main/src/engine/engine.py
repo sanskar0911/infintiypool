@@ -51,6 +51,254 @@ class BacktestEngine:
         self.position_sizer = PositionSizer(self.config, cost_model=self.cost_model)
         self.execution_model = ExecutionModel(self.config)
 
+    def _process_pending_orders(
+        self,
+        pending_orders: List[Order],
+        bar_idx: int,
+        date: pd.Timestamp,
+        df: pd.DataFrame,
+        portfolio_mgr: PortfolioManager,
+        trade_logger: TradeLogger,
+        all_fills: List[Fill],
+        execution_trace: List[str],
+        exited_symbols_this_bar: set,
+        entry_price: float
+    ) -> float:
+        """Process executable pending orders (sells first, then buys alphabetically)."""
+        executable_pending = []
+        for order in list(pending_orders):
+            base_price, exec_time, timing_note = self.execution_model.resolve_execution_price(order, bar_idx, df)
+            if base_price is not None:
+                executable_pending.append((order, base_price, exec_time, timing_note))
+
+        # Separate into sells and buys
+        sell_pending = [x for x in executable_pending if x[0].is_sell()]
+        buy_pending = [x for x in executable_pending if x[0].is_buy()]
+
+        # Sort buys alphabetically by symbol
+        buy_pending.sort(key=lambda x: x[0].symbol)
+
+        # Process SELLS first
+        for order, base_price, exec_time, timing_note in sell_pending:
+            fill_price, slip_per_share = self.execution_model.slippage_model.calculate_fill_price(
+                base_price=base_price,
+                side=order.side
+            )
+            total_slippage_cost = slip_per_share * order.quantity
+            cost_info = self.cost_model.calculate_cost(order.quantity, fill_price, side=OrderSide.SELL)
+
+            pos = portfolio_mgr.get_position(order.symbol)
+            fill_qty = min(order.quantity, pos.quantity)
+            if fill_qty <= 0:
+                order.status = OrderStatus.REJECTED
+                trade_logger.log_rejection(
+                    timestamp=exec_time or date,
+                    symbol=order.symbol,
+                    side=order.side,
+                    quantity=order.quantity,
+                    price=base_price,
+                    cash_available=portfolio_mgr.cash,
+                    portfolio_value=portfolio_mgr.get_total_portfolio_value(),
+                    rejection_reason="No open shares held to sell",
+                    order_id=order.order_id
+                )
+                if order in pending_orders:
+                    pending_orders.remove(order)
+                continue
+
+            if fill_qty != order.quantity:
+                cost_info = self.cost_model.calculate_cost(fill_qty, fill_price, side=OrderSide.SELL)
+                total_slippage_cost = slip_per_share * fill_qty
+
+            net_value = cost_info["gross_value"] - cost_info["total_cost"]
+
+            fill = Fill(
+                timestamp=exec_time or date,
+                symbol=order.symbol,
+                side=order.side,
+                quantity=fill_qty,
+                reference_price=base_price,
+                fill_price=fill_price,
+                slippage_cost=total_slippage_cost,
+                brokerage=cost_info["brokerage"],
+                stt=cost_info["stt"],
+                stamp_duty=cost_info["stamp_duty"],
+                gst=cost_info["gst"],
+                exchange_charges=cost_info["exchange_charges"],
+                transaction_cost=cost_info["total_cost"],
+                gross_value=cost_info["gross_value"],
+                net_value=net_value,
+                order_id=order.order_id,
+                reason=order.reason
+            )
+
+            pos_before = pos.quantity
+            cash_before, cash_after, realized_pnl = portfolio_mgr.apply_fill(fill)
+            order.status = OrderStatus.FILLED
+            order.quantity = fill_qty
+
+            trade_logger.log_trade(
+                fill=fill,
+                cash_before=cash_before,
+                cash_after=cash_after,
+                portfolio_value=portfolio_mgr.get_total_portfolio_value(),
+                position_before=pos_before,
+                position_after=pos.quantity,
+                realized_pnl=realized_pnl,
+                unrealized_pnl=portfolio_mgr.get_unrealized_pnl(),
+                order_status="FILLED",
+                reason=order.reason
+            )
+
+            all_fills.append(fill)
+            if order in pending_orders:
+                pending_orders.remove(order)
+            exited_symbols_this_bar.add(order.symbol)
+            entry_price = 0.0
+
+            execution_trace.append(
+                f"BAR {bar_idx} ({date.strftime('%Y-%m-%d')}): EXECUTED SELL {fill.quantity} shares of {order.symbol} "
+                f"@ ₹{fill_price:,.2f} [Net Proceeds: ₹{net_value:,.2f}, Realized PnL: ₹{realized_pnl:,.2f}]"
+            )
+
+        # Process BUYS second (alphabetically)
+        for order, base_price, exec_time, timing_note in buy_pending:
+            if portfolio_mgr.has_open_position(order.symbol):
+                order.status = OrderStatus.REJECTED
+                trade_logger.log_rejection(
+                    timestamp=exec_time or date,
+                    symbol=order.symbol,
+                    side=order.side,
+                    quantity=order.quantity,
+                    price=base_price,
+                    cash_available=portfolio_mgr.cash,
+                    portfolio_value=portfolio_mgr.get_total_portfolio_value(),
+                    rejection_reason="Duplicate Position Prevention: Symbol already held",
+                    order_id=order.order_id
+                )
+                if order in pending_orders:
+                    pending_orders.remove(order)
+                continue
+
+            if order.symbol in exited_symbols_this_bar:
+                order.status = OrderStatus.REJECTED
+                trade_logger.log_rejection(
+                    timestamp=exec_time or date,
+                    symbol=order.symbol,
+                    side=order.side,
+                    quantity=order.quantity,
+                    price=base_price,
+                    cash_available=portfolio_mgr.cash,
+                    portfolio_value=portfolio_mgr.get_total_portfolio_value(),
+                    rejection_reason="Same-Event Re-Entry Suppressed: Position exited in same event",
+                    order_id=order.order_id
+                )
+                if order in pending_orders:
+                    pending_orders.remove(order)
+                continue
+
+            fill_price, slip_per_share = self.execution_model.slippage_model.calculate_fill_price(
+                base_price=base_price,
+                side=order.side
+            )
+
+            port_equity = portfolio_mgr.get_total_portfolio_value()
+            fill_qty, sizer_note = self.position_sizer.calculate_buy_quantity(
+                current_cash=portfolio_mgr.cash,
+                price=base_price,
+                portfolio_equity=port_equity,
+                position_size=self.config.position_size
+            )
+
+            if fill_qty <= 0:
+                order.status = OrderStatus.REJECTED
+                trade_logger.log_rejection(
+                    timestamp=exec_time or date,
+                    symbol=order.symbol,
+                    side=order.side,
+                    quantity=order.quantity,
+                    price=base_price,
+                    cash_available=portfolio_mgr.cash,
+                    portfolio_value=port_equity,
+                    rejection_reason=sizer_note,
+                    order_id=order.order_id
+                )
+                if order in pending_orders:
+                    pending_orders.remove(order)
+                continue
+
+            cost_info = self.cost_model.calculate_cost(fill_qty, fill_price, side=OrderSide.BUY)
+            net_debit = cost_info["gross_value"] + cost_info["total_cost"]
+            total_slippage_cost = slip_per_share * fill_qty
+
+            if net_debit > portfolio_mgr.cash:
+                order.status = OrderStatus.REJECTED
+                trade_logger.log_rejection(
+                    timestamp=exec_time or date,
+                    symbol=order.symbol,
+                    side=order.side,
+                    quantity=fill_qty,
+                    price=base_price,
+                    cash_available=portfolio_mgr.cash,
+                    portfolio_value=port_equity,
+                    rejection_reason=f"Insufficient Cash: Required ₹{net_debit:,.2f} > Cash ₹{portfolio_mgr.cash:,.2f}",
+                    order_id=order.order_id
+                )
+                if order in pending_orders:
+                    pending_orders.remove(order)
+                continue
+
+            fill = Fill(
+                timestamp=exec_time or date,
+                symbol=order.symbol,
+                side=order.side,
+                quantity=fill_qty,
+                reference_price=base_price,
+                fill_price=fill_price,
+                slippage_cost=total_slippage_cost,
+                brokerage=cost_info["brokerage"],
+                stt=cost_info["stt"],
+                stamp_duty=cost_info["stamp_duty"],
+                gst=cost_info["gst"],
+                exchange_charges=cost_info["exchange_charges"],
+                transaction_cost=cost_info["total_cost"],
+                gross_value=cost_info["gross_value"],
+                net_value=net_debit,
+                order_id=order.order_id,
+                reason=order.reason
+            )
+
+            pos = portfolio_mgr.get_position(order.symbol)
+            pos_before = pos.quantity
+            cash_before, cash_after, _ = portfolio_mgr.apply_fill(fill)
+            order.status = OrderStatus.FILLED
+            order.quantity = fill_qty
+
+            trade_logger.log_trade(
+                fill=fill,
+                cash_before=cash_before,
+                cash_after=cash_after,
+                portfolio_value=portfolio_mgr.get_total_portfolio_value(),
+                position_before=pos_before,
+                position_after=pos.quantity,
+                realized_pnl=0.0,
+                unrealized_pnl=portfolio_mgr.get_unrealized_pnl(),
+                order_status="FILLED",
+                reason=order.reason
+            )
+
+            all_fills.append(fill)
+            if order in pending_orders:
+                pending_orders.remove(order)
+            entry_price = fill.fill_price
+
+            execution_trace.append(
+                f"BAR {bar_idx} ({date.strftime('%Y-%m-%d')}): EXECUTED BUY {fill.quantity} shares of {order.symbol} "
+                f"@ ₹{fill_price:,.2f} [Debit: ₹{net_debit:,.2f}, Remaining Cash: ₹{cash_after:,.2f}]"
+            )
+
+        return entry_price
+
     def run(self, df: pd.DataFrame, symbol: str = "ASSET") -> BacktestResult:
         """
         Execute full bar-by-bar backtest simulation.
@@ -100,252 +348,17 @@ class BacktestEngine:
             close_price = float(close_prices[i])
             exited_symbols_this_bar.clear()
 
-            # ------------------------------------------------------------------
-            # STEP 1: Process Pending Orders from Previous Bar(s)
-            # Order Sequencing Rule: Process SELL orders first, credit cash,
-            # then process BUY orders sorted alphabetically by symbol!
-            # ------------------------------------------------------------------
-            executable_pending = []
-            for order in pending_orders:
-                base_price, exec_time, timing_note = self.execution_model.resolve_execution_price(order, i, df)
-                if base_price is not None:
-                    executable_pending.append((order, base_price, exec_time, timing_note))
-
-            # Separate into sells and buys
-            sell_pending = [x for x in executable_pending if x[0].is_sell()]
-            buy_pending = [x for x in executable_pending if x[0].is_buy()]
-
-            # Sort buys alphabetically by symbol
-            buy_pending.sort(key=lambda x: x[0].symbol)
-
-            # Process SELLS first
-            for order, base_price, exec_time, timing_note in sell_pending:
-                fill_price, slip_per_share = self.execution_model.slippage_model.calculate_fill_price(
-                    base_price=base_price,
-                    side=order.side
+            # For NEXT_BAR_OPEN / NEXT_BAR_CLOSE: process pending orders from previous bar(s)
+            if self.config.execution_timing != ExecutionTiming.SAME_BAR_CLOSE:
+                entry_price = self._process_pending_orders(
+                    pending_orders, i, date, df, portfolio_mgr, trade_logger,
+                    all_fills, execution_trace, exited_symbols_this_bar, entry_price
                 )
-                total_slippage_cost = slip_per_share * order.quantity
-                cost_info = self.cost_model.calculate_cost(order.quantity, fill_price, side=OrderSide.SELL)
+                portfolio_mgr.update_market_prices({symbol: close_price})
+                snapshot = portfolio_mgr.snapshot(date)
+                portfolio_history.append(snapshot)
 
-                pos = portfolio_mgr.get_position(order.symbol)
-                fill_qty = min(order.quantity, pos.quantity)
-                if fill_qty <= 0:
-                    order.status = OrderStatus.REJECTED
-                    trade_logger.log_rejection(
-                        timestamp=exec_time or date,
-                        symbol=order.symbol,
-                        side=order.side,
-                        quantity=order.quantity,
-                        price=base_price,
-                        cash_available=portfolio_mgr.cash,
-                        portfolio_value=portfolio_mgr.get_total_portfolio_value(),
-                        rejection_reason="No open shares held to sell",
-                        order_id=order.order_id
-                    )
-                    pending_orders.remove(order)
-                    continue
-
-                if fill_qty != order.quantity:
-                    # Recalculate with adjusted quantity
-                    cost_info = self.cost_model.calculate_cost(fill_qty, fill_price, side=OrderSide.SELL)
-                    total_slippage_cost = slip_per_share * fill_qty
-
-                # Net value = gross value minus all sell-side costs
-                net_value = cost_info["gross_value"] - cost_info["total_cost"]
-
-                fill = Fill(
-                    timestamp=exec_time or date,
-                    symbol=order.symbol,
-                    side=order.side,
-                    quantity=fill_qty,
-                    reference_price=base_price,
-                    fill_price=fill_price,
-                    slippage_cost=total_slippage_cost,
-                    brokerage=cost_info["brokerage"],
-                    stt=cost_info["stt"],
-                    stamp_duty=cost_info["stamp_duty"],
-                    gst=cost_info["gst"],
-                    exchange_charges=cost_info["exchange_charges"],
-                    transaction_cost=cost_info["total_cost"],
-                    gross_value=cost_info["gross_value"],
-                    net_value=net_value,
-                    order_id=order.order_id,
-                    reason=order.reason
-                )
-
-                pos_before = pos.quantity
-                cash_before, cash_after, realized_pnl = portfolio_mgr.apply_fill(fill)
-                order.status = OrderStatus.FILLED
-                order.quantity = fill_qty
-
-                trade_logger.log_trade(
-                    fill=fill,
-                    cash_before=cash_before,
-                    cash_after=cash_after,
-                    portfolio_value=portfolio_mgr.get_total_portfolio_value(),
-                    position_before=pos_before,
-                    position_after=pos.quantity,
-                    realized_pnl=realized_pnl,
-                    unrealized_pnl=portfolio_mgr.get_unrealized_pnl(),
-                    order_status="FILLED",
-                    reason=order.reason
-                )
-
-                all_fills.append(fill)
-                pending_orders.remove(order)
-                exited_symbols_this_bar.add(order.symbol)
-                entry_price = 0.0
-
-                execution_trace.append(
-                    f"BAR {i} ({date.strftime('%Y-%m-%d')}): EXECUTED SELL {fill.quantity} shares of {order.symbol} "
-                    f"@ ₹{fill_price:,.2f} [Net Proceeds: ₹{net_value:,.2f}, Realized PnL: ₹{realized_pnl:,.2f}]"
-                )
-
-            # Process BUYS second (alphabetically)
-            for order, base_price, exec_time, timing_note in buy_pending:
-                # Duplicate position check: Ignore BUY if symbol already held
-                if portfolio_mgr.has_open_position(order.symbol):
-                    order.status = OrderStatus.REJECTED
-                    trade_logger.log_rejection(
-                        timestamp=exec_time or date,
-                        symbol=order.symbol,
-                        side=order.side,
-                        quantity=order.quantity,
-                        price=base_price,
-                        cash_available=portfolio_mgr.cash,
-                        portfolio_value=portfolio_mgr.get_total_portfolio_value(),
-                        rejection_reason="Duplicate Position Prevention: Symbol already held",
-                        order_id=order.order_id
-                    )
-                    pending_orders.remove(order)
-                    continue
-
-                # Same-bar re-entry suppression
-                if order.symbol in exited_symbols_this_bar:
-                    order.status = OrderStatus.REJECTED
-                    trade_logger.log_rejection(
-                        timestamp=exec_time or date,
-                        symbol=order.symbol,
-                        side=order.side,
-                        quantity=order.quantity,
-                        price=base_price,
-                        cash_available=portfolio_mgr.cash,
-                        portfolio_value=portfolio_mgr.get_total_portfolio_value(),
-                        rejection_reason="Same-Event Re-Entry Suppressed: Position exited in same event",
-                        order_id=order.order_id
-                    )
-                    pending_orders.remove(order)
-                    continue
-
-                fill_price, slip_per_share = self.execution_model.slippage_model.calculate_fill_price(
-                    base_price=base_price,
-                    side=order.side
-                )
-
-                # Re-verify affordability with current post-sell cash and equity
-                port_equity = portfolio_mgr.get_total_portfolio_value()
-                fill_qty, sizer_note = self.position_sizer.calculate_buy_quantity(
-                    current_cash=portfolio_mgr.cash,
-                    price=base_price,
-                    portfolio_equity=port_equity,
-                    position_size=self.config.position_size
-                )
-
-                if fill_qty <= 0:
-                    order.status = OrderStatus.REJECTED
-                    trade_logger.log_rejection(
-                        timestamp=exec_time or date,
-                        symbol=order.symbol,
-                        side=order.side,
-                        quantity=order.quantity,
-                        price=base_price,
-                        cash_available=portfolio_mgr.cash,
-                        portfolio_value=port_equity,
-                        rejection_reason=sizer_note,
-                        order_id=order.order_id
-                    )
-                    pending_orders.remove(order)
-                    continue
-
-                cost_info = self.cost_model.calculate_cost(fill_qty, fill_price, side=OrderSide.BUY)
-                net_debit = cost_info["gross_value"] + cost_info["total_cost"]
-                total_slippage_cost = slip_per_share * fill_qty
-
-                # Strict cash invariant check: debit must not exceed cash
-                if net_debit > portfolio_mgr.cash:
-                    order.status = OrderStatus.REJECTED
-                    trade_logger.log_rejection(
-                        timestamp=exec_time or date,
-                        symbol=order.symbol,
-                        side=order.side,
-                        quantity=fill_qty,
-                        price=base_price,
-                        cash_available=portfolio_mgr.cash,
-                        portfolio_value=port_equity,
-                        rejection_reason=f"Insufficient Cash: Required ₹{net_debit:,.2f} > Cash ₹{portfolio_mgr.cash:,.2f}",
-                        order_id=order.order_id
-                    )
-                    pending_orders.remove(order)
-                    continue
-
-                fill = Fill(
-                    timestamp=exec_time or date,
-                    symbol=order.symbol,
-                    side=order.side,
-                    quantity=fill_qty,
-                    reference_price=base_price,
-                    fill_price=fill_price,
-                    slippage_cost=total_slippage_cost,
-                    brokerage=cost_info["brokerage"],
-                    stt=cost_info["stt"],
-                    stamp_duty=cost_info["stamp_duty"],
-                    gst=cost_info["gst"],
-                    exchange_charges=cost_info["exchange_charges"],
-                    transaction_cost=cost_info["total_cost"],
-                    gross_value=cost_info["gross_value"],
-                    net_value=net_debit,
-                    order_id=order.order_id,
-                    reason=order.reason
-                )
-
-                pos = portfolio_mgr.get_position(order.symbol)
-                pos_before = pos.quantity
-                cash_before, cash_after, _ = portfolio_mgr.apply_fill(fill)
-                order.status = OrderStatus.FILLED
-                order.quantity = fill_qty
-
-                trade_logger.log_trade(
-                    fill=fill,
-                    cash_before=cash_before,
-                    cash_after=cash_after,
-                    portfolio_value=portfolio_mgr.get_total_portfolio_value(),
-                    position_before=pos_before,
-                    position_after=pos.quantity,
-                    realized_pnl=0.0,
-                    unrealized_pnl=portfolio_mgr.get_unrealized_pnl(),
-                    order_status="FILLED",
-                    reason=order.reason
-                )
-
-                all_fills.append(fill)
-                pending_orders.remove(order)
-                entry_price = fill.fill_price
-
-                execution_trace.append(
-                    f"BAR {i} ({date.strftime('%Y-%m-%d')}): EXECUTED BUY {fill.quantity} shares of {order.symbol} "
-                    f"@ ₹{fill_price:,.2f} [Debit: ₹{net_debit:,.2f}, Remaining Cash: ₹{cash_after:,.2f}]"
-                )
-
-            # ------------------------------------------------------------------
-            # STEP 2: Update Mark-to-Market Valuation for Bar i
-            # ------------------------------------------------------------------
-            portfolio_mgr.update_market_prices({symbol: close_price})
-            snapshot = portfolio_mgr.snapshot(date)
-            portfolio_history.append(snapshot)
-
-            # ------------------------------------------------------------------
-            # STEP 3: Completed-Bar Signal Generation & Risk Rules
-            # ------------------------------------------------------------------
+            # Signal Generation & Risk Rules for Bar i
             pos_tracker = portfolio_mgr.get_position(symbol)
             curr_shares = pos_tracker.quantity
 
@@ -409,6 +422,16 @@ class BacktestEngine:
                     )
                     all_orders.append(buy_order)
                     pending_orders.append(buy_order)
+
+            # For SAME_BAR_CLOSE: execute generated orders on the same bar immediately!
+            if self.config.execution_timing == ExecutionTiming.SAME_BAR_CLOSE:
+                entry_price = self._process_pending_orders(
+                    pending_orders, i, date, df, portfolio_mgr, trade_logger,
+                    all_fills, execution_trace, exited_symbols_this_bar, entry_price
+                )
+                portfolio_mgr.update_market_prices({symbol: close_price})
+                snapshot = portfolio_mgr.snapshot(date)
+                portfolio_history.append(snapshot)
 
         # ----------------------------------------------------------------------
         # STEP 4: Terminal Policy (Force-close remaining open positions)

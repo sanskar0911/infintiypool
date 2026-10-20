@@ -335,16 +335,16 @@ def run_signal_file_backtest(
 
             fill_price, slip_per_share = slippage_model.calculate_fill_price(ref_price, OrderSide.BUY)
 
-            # Sizing: Target allocation 5% of current equity E
+            # Sizing (Spec §2): Cash Allocation = Available Cash x 5%
             port_equity = portfolio_mgr.get_total_portfolio_value()
-            sizing_basis = getattr(cfg, "sizing_basis", "equity")
+            sizing_basis = getattr(cfg, "sizing_basis", "cash")
             base_capital = port_equity if sizing_basis == "equity" else portfolio_mgr.cash
             target_alloc = base_capital * cfg.position_size
 
             # Proportional buy cost rate
             r_buy = cost_model.buy_cost_rate
             max_affordable = portfolio_mgr.cash / (1.0 + r_buy)
-            v_max = min(target_alloc, max_affordable)
+            v_max = min(target_alloc / (1.0 + r_buy), max_affordable)
 
             if v_max <= 0 or fill_price <= 0:
                 continue

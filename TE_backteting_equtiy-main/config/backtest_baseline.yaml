@@ -20,13 +20,14 @@ portfolio:
   terminal_exit_reason: "Terminal Liquidation"
 
 position_sizing:
-  method: "fixed_fraction"             # Fixed fraction of current portfolio equity
-  target_allocation_fraction: 0.05     # 5.0% of current equity per new position
-  sizing_basis: "equity"               # "equity" (baseline) or "cash" (compatibility mode)
+  method: "fixed_fraction"             # Fixed fraction of AVAILABLE CASH
+  target_allocation_fraction: 0.05     # 5.0% of current remaining cash per new position
+  sizing_basis: "cash"                 # Spec baseline: "cash" (alt: "equity")
+  # Max Affordable Value = (Cash x 0.05) / (1 + buy_cost_rate 0.000504); Qty = floor(V / P_buy)
   insufficient_cash_policy: "REJECT"   # REJECT if cash insufficient for 1 whole share
 
 execution:
-  timing: "NEXT_BAR_OPEN"              # Completed-bar signal executed at first available quote
+  timing: "SAME_BAR_CLOSE"             # Signal executed on same bar/day when signal is generated (not on next day)
   intrabar_mode: false                 # Mode A (completed bar) vs Mode B (intrabar/tick)
   slippage_model: "percentage"         # Adverse percentage slippage
   slippage_rate: 0.0005                # 0.05% adverse slippage per side (s = 0.0005)

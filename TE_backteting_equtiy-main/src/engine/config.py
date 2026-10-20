@@ -89,7 +89,7 @@ class BacktestConfig:
     gst_rate: float = 0.18              # 18% GST
     exchange_charge_rate: float = 0.0   # 0% baseline
     sebi_charge_rate: float = 0.0       # 0% baseline
-    execution_timing: ExecutionTiming = ExecutionTiming.NEXT_BAR_OPEN
+    execution_timing: ExecutionTiming = ExecutionTiming.SAME_BAR_CLOSE
     insufficient_cash_policy: InsufficientCashPolicy = InsufficientCashPolicy.REJECT
     allow_short_selling: bool = False
     stop_loss: Optional[float] = None
@@ -160,13 +160,13 @@ class BacktestConfig:
         if "position_sizing" in raw:
             ps = raw["position_sizing"]
             flat["position_size"] = float(ps.get("target_allocation_fraction", 0.05))
-            flat["sizing_basis"] = str(ps.get("sizing_basis", "equity"))
+            flat["sizing_basis"] = str(ps.get("sizing_basis", "cash"))
             policy_str = str(ps.get("insufficient_cash_policy", "REJECT"))
             flat["insufficient_cash_policy"] = InsufficientCashPolicy(policy_str)
 
         if "execution" in raw:
             ex = raw["execution"]
-            timing_str = str(ex.get("timing", "NEXT_BAR_OPEN"))
+            timing_str = str(ex.get("timing", "SAME_BAR_CLOSE"))
             flat["execution_timing"] = ExecutionTiming(timing_str)
             flat["slippage_bps"] = float(ex.get("slippage_rate", 0.0005)) * 10000.0
 

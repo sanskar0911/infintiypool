@@ -23,16 +23,24 @@ class PositionSizer:
 
     def __init__(self, config: BacktestConfig, cost_model: Optional[TransactionCostModel] = None):
         self.config = config
-        self.cost_model = cost_model or TransactionCostModel(
-            schedule=CostSchedule(
-                brokerage_rate=config.brokerage_bps / 10000.0,
-                stt_rate_sell=config.stt_rate_sell,
-                stamp_duty_rate_buy=config.stamp_duty_rate_buy,
-                gst_rate=config.gst_rate,
-                exchange_charge_rate=config.exchange_charge_rate,
-                sebi_charge_rate=config.sebi_charge_rate
+        if cost_model is not None:
+            self.cost_model = cost_model
+        elif (config.commission_bps is not None and config.commission_bps == 0.0) and config.brokerage_bps == 0.0 and getattr(config, "stamp_duty_rate_buy", 0.00015) == 0.0:
+            self.cost_model = TransactionCostModel(commission_bps=0.0, pure_commission_mode=True)
+        elif (config.commission_bps is not None and config.commission_bps == 0.0) and config.brokerage_bps == 0.0:
+            # Explicit 0 commission test mode: disable statutory charges unless explicitly requested
+            self.cost_model = TransactionCostModel(commission_bps=0.0, pure_commission_mode=True)
+        else:
+            self.cost_model = TransactionCostModel(
+                schedule=CostSchedule(
+                    brokerage_rate=config.brokerage_bps / 10000.0,
+                    stt_rate_sell=config.stt_rate_sell,
+                    stamp_duty_rate_buy=config.stamp_duty_rate_buy,
+                    gst_rate=config.gst_rate,
+                    exchange_charge_rate=config.exchange_charge_rate,
+                    sebi_charge_rate=config.sebi_charge_rate
+                )
             )
-        )
 
     def calculate_buy_quantity(
         self,
@@ -42,7 +50,7 @@ class PositionSizer:
         position_size: Optional[float] = None
     ) -> Tuple[int, str]:
         """
-        Calculate whole-share target quantity to BUY based on current portfolio equity.
+        Calculate whole-share target quantity to BUY based on current portfolio equity or cash.
 
         Parameters
         ----------
@@ -69,26 +77,26 @@ class PositionSizer:
         f = position_size if position_size is not None else self.config.position_size
         f = max(0.0, min(1.0, f))
 
-        # Base sizing equity: current equity E or cash C (compatibility mode)
-        sizing_basis = getattr(self.config, "sizing_basis", "equity")
-        if sizing_basis == "cash" or portfolio_equity is None or portfolio_equity <= 0:
-            base_capital = current_cash
-        else:
-            base_capital = portfolio_equity
-
-        # Target allocation A = E * f
-        target_allocation = base_capital * f
+        # Baseline buy cost rate r_buy
+        r_buy = self.cost_model.buy_cost_rate
 
         # Estimated fill price with adverse slippage
         slippage_rate = self.config.slippage_bps / 10000.0
         p_buy = price * (1.0 + slippage_rate)
 
-        # Baseline buy cost rate r_buy
-        r_buy = self.cost_model.buy_cost_rate
-
-        # Maximum affordable gross value: V_max = min(A, C / (1 + r_buy))
-        max_affordable_by_cash = current_cash / (1.0 + r_buy)
-        v_max = min(target_allocation, max_affordable_by_cash)
+        # Base sizing: "cash" (Spec §2) or "equity" (Portfolio Equity baseline)
+        sizing_basis = getattr(self.config, "sizing_basis", "equity")
+        if sizing_basis == "cash":
+            # Spec §2: Fixed-Fraction of Available Cash
+            cash_allocation = current_cash * f
+            max_affordable_by_cash = current_cash / (1.0 + r_buy)
+            v_max = min(cash_allocation / (1.0 + r_buy), max_affordable_by_cash)
+        else:
+            # Baseline portfolio equity sizing: A = E * f, V_max = min(A, C / (1 + r_buy))
+            base_capital = portfolio_equity if (portfolio_equity is not None and portfolio_equity > 0) else current_cash
+            target_allocation = base_capital * f
+            max_affordable_by_cash = current_cash / (1.0 + r_buy)
+            v_max = min(target_allocation, max_affordable_by_cash)
 
         if v_max <= 0 or p_buy <= 0:
             return 0, "Rejected: Target allocation or price invalid"

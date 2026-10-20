@@ -9,7 +9,7 @@ Stock Ticker / Universe: INFY
 Hypothesis            : Quantitative momentum / trend following strategy
 Date Range            : 2020-01-01 to 2024-12-31
 Initial Capital        : INR 100,000.00
-Final Portfolio Value  : INR 117,865.52
+Final Portfolio Value  : INR 119,314.77
 
 2. EXECUTION & PORTFOLIO RULES
 --------------------------------------------------------------------------------
@@ -22,28 +22,28 @@ Stop Loss / Take Profit: SL None% | TP None%
 
 3. PERFORMANCE & RETURN METRICS
 --------------------------------------------------------------------------------
-Total Return          : 17.87%
-CAGR (Compound Ann)   : 3.34%
+Total Return          : 19.31%
+CAGR (Compound Ann)   : 3.60%
 Annualized Volatility : 0.00%
-Sharpe Ratio (Rf=0)   : 0.5697
-Sortino Ratio (Rf=0)  : 0.8484
-Maximum Drawdown (MDD): -8.39%
+Sharpe Ratio (Rf=0)   : 0.6159
+Sortino Ratio (Rf=0)  : 0.9106
+Maximum Drawdown (MDD): -8.24%
 
 4. TRADING & EXPOSURE STATISTICS
 --------------------------------------------------------------------------------
 Total Executed Trades : 0
 Trade Win Rate        : 45.45%
 Annual Portfolio Turnover: 0.00%
-Market Time Exposure  : 13.28%
+Market Time Exposure  : 13.39%
 
 5. BENCHMARK COMPARISON (NIFTY50)
 --------------------------------------------------------------------------------
-Strategy CAGR vs Benchmark: 3.34% vs 16.10%
-Excess Annual Return   : -12.76%
-Strategy Sharpe vs Bench  : 0.57 vs 0.84
-Portfolio Beta        : 0.08
-Correlation with Bench: 0.28
-Information Ratio     : -0.65
+Strategy CAGR vs Benchmark: 3.60% vs 16.10%
+Excess Annual Return   : -12.50%
+Strategy Sharpe vs Bench  : 0.62 vs 0.84
+Portfolio Beta        : 0.09
+Correlation with Bench: 0.30
+Information Ratio     : -0.64
 
 6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS
 --------------------------------------------------------------------------------

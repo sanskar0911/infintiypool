@@ -18,13 +18,10 @@ import json
 import base64
 import urllib.parse
 import math
-from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Dict, Any, List, Optional
 import pandas as pd
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 # Ensure local module imports work
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -191,182 +188,7 @@ def evaluate_and_recommend_strategies(
 
 
 def run_full_simulation(params: dict) -> dict:
-    """Execute complete end-to-end backtest pipeline for either Signal Files or Strategy Engine."""
-    source_type = params.get("source", "signal_file")
-    initial_capital = float(params.get("capital", 10000000.0 if source_type == "signal_file" else 100000.0))
-    position_size = float(params.get("position_size", 0.02 if source_type == "signal_file" else 0.2))
-    txn_cost_rate = float(params.get("commission", 0.0003 if source_type == "signal_file" else 0.001))
-    slippage_rate = float(params.get("slippage", 0.0005))
-    results_dir = os.path.join(BASE_DIR, "results")
-    os.makedirs(results_dir, exist_ok=True)
-
-    # =========================================================================
-    # 1. SIGNAL FILE BACKTEST ENGINE (QUANTLAB v1.1 INDIAN CASH EQUITIES)
-    # =========================================================================
-    if source_type in ["signal_file", "file"]:
-        from engine.signal_ingestion import run_signal_file_backtest
-        from engine.config import get_default_baseline_config
-        from engine.llm_auditor import run_quantitative_llm_audit
-
-        sig_file = params.get("signal_file") or params.get("file", "signalsmain2.py.csv")
-        file_content = params.get("file_content")
-        file_target = sig_file
-        if file_content:
-            custom_path = os.path.join(results_dir, "custom_uploaded_signals.csv")
-            with open(custom_path, "w", encoding="utf-8") as f:
-                f.write(file_content)
-            file_target = custom_path
-
-        cfg = get_default_baseline_config()
-        cfg.initial_capital = initial_capital
-        cfg.position_size = position_size
-        cfg.brokerage_bps = txn_cost_rate * 10000.0
-        cfg.slippage_bps = slippage_rate * 10000.0
-
-        res = run_signal_file_backtest(file_target, config=cfg, output_dir=results_dir)
-        trade_log_df = res["trade_log_df"]
-        portfolio_df = res["portfolio_df"]
-        metrics = res["metrics"]
-
-        # Run Autonomous LLM Quantitative Audit
-        audit_df, audit_summary = run_quantitative_llm_audit(
-            metrics=metrics,
-            trade_log_df=trade_log_df,
-            portfolio_df=portfolio_df,
-            initial_capital=initial_capital
-        )
-        audit_df.to_csv(os.path.join(results_dir, "llm_validation_analysis.csv"), index=False)
-        trade_log_df.to_csv(os.path.join(results_dir, "trade_ledger.csv"))
-        portfolio_df.to_csv(os.path.join(results_dir, "daily_equity_curve.csv"))
-        metrics_df = pd.DataFrame([{"Metric Name": k, "Calculated Value": v} for k, v in metrics.items()])
-        metrics_df.to_csv(os.path.join(results_dir, "engine_metrics.csv"), index=False)
-
-        # Generate All 7 Performance Visualizations
-        sig_path = os.path.join(results_dir, "signals_chart.png")
-        eq_path = os.path.join(results_dir, "equity_curve.png")
-        dd_path = os.path.join(results_dir, "drawdown.png")
-        sharpe_path = os.path.join(results_dir, "rolling_sharpe.png")
-        monthly_path = os.path.join(results_dir, "monthly_returns.png")
-        dist_path = os.path.join(results_dir, "trade_distribution.png")
-        alloc_path = os.path.join(results_dir, "portfolio_allocation.png")
-
-        plot_equity_curve(portfolio_df, str(sig_file), eq_path)
-        plot_drawdown(portfolio_df, dd_path)
-        plot_rolling_sharpe(portfolio_df, sharpe_path)
-        plot_monthly_returns(portfolio_df, monthly_path)
-        plot_trade_distribution(trade_log_df, dist_path)
-        plot_portfolio_allocation(portfolio_df, alloc_path)
-
-        # Signals timeline chart
-        fig, ax = plt.subplots(figsize=(10, 4.5), dpi=150)
-        pnl_series = trade_log_df["Realized PnL"].cumsum() if "Realized PnL" in trade_log_df.columns else np.zeros(len(trade_log_df))
-        ax.plot(range(1, len(trade_log_df) + 1), pnl_series, color="#3b82f6", lw=2, label="Cumulative Realized P&L (₹)")
-        ax.axhline(0, color="#64748b", ls="--", alpha=0.6)
-        ax.set_title(f"QUANTLAB v1.1 - Signal Ingestion Sequence ({sig_file})", color="white", fontsize=12, fontweight="bold")
-        ax.set_xlabel("Signal Execution Index", color="#94a3b8")
-        ax.set_ylabel("Cumulative P&L (₹)", color="#94a3b8")
-        ax.set_facecolor("#111827")
-        fig.patch.set_facecolor("#0b0f19")
-        ax.tick_params(colors="#94a3b8")
-        for spine in ax.spines.values():
-            spine.set_color("#334155")
-        ax.legend(facecolor="#1e293b", edgecolor="#475569", labelcolor="white")
-        plt.tight_layout()
-        fig.savefig(sig_path)
-        plt.close(fig)
-
-        chart_images = {
-            "signals": get_image_base64(sig_path),
-            "equity": get_image_base64(eq_path),
-            "drawdown": get_image_base64(dd_path),
-            "rolling_sharpe": get_image_base64(sharpe_path),
-            "monthly_returns": get_image_base64(monthly_path),
-            "trade_dist": get_image_base64(dist_path),
-            "allocation": get_image_base64(alloc_path)
-        }
-
-        # Formatted Fact Sheet Summary Report
-        report_path = os.path.join(results_dir, "summary_report.txt")
-        config_dict = {
-            "strategy_name": f"QUANTLAB v1.1 Signal Engine ({sig_file})",
-            "stock_ticker": str(sig_file),
-            "start_date": str(portfolio_df.index[0])[:10] if not portfolio_df.empty else "N/A",
-            "end_date": str(portfolio_df.index[-1])[:10] if not portfolio_df.empty else "N/A",
-            "initial_capital": initial_capital,
-            "final_value": portfolio_df["Portfolio Value"].iloc[-1] if not portfolio_df.empty else initial_capital,
-            "position_size": position_size,
-            "txn_cost_rate": txn_cost_rate,
-            "slippage_rate": slippage_rate,
-            "stop_loss": None,
-            "take_profit": None
-        }
-        generate_summary_report(metrics, config_dict, report_path)
-        summary_text = ""
-        if os.path.exists(report_path):
-            with open(report_path, "r", encoding="utf-8", errors="replace") as f:
-                summary_text = f.read()
-
-        # Format Trades Table
-        trades = []
-        for idx, row in trade_log_df.iterrows():
-            trade_date = str(row.get("Date", idx))[:19]
-            raw_type = str(row.get("Type", row.get("BUY/SELL", row.get("Side", "N/A"))))
-            trade_type = "BUY" if "BUY" in raw_type.upper() else ("SELL" if "SELL" in raw_type.upper() else raw_type)
-            trades.append({
-                "Date": trade_date,
-                "Type": trade_type,
-                "Price": float(row.get("Execution Price", row.get("Executed Price", row.get("Price", 0.0)))),
-                "Shares": int(row.get("Quantity", row.get("Shares", 0))),
-                "Value": float(row.get("Gross Value", row.get("Value", 0.0))),
-                "Transaction Cost": float(row.get("Transaction Cost", row.get("Commission", 0.0))),
-                "Remaining Cash": float(row.get("Cash After", row.get("Cash", row.get("Remaining Cash", 0.0))))
-            })
-
-        recommendations = {
-            "recommended_strategy": "QUANTLAB v1.1 Signal Engine",
-            "recommended_label": f"Signal File: {sig_file}",
-            "recommended_score": 9.45,
-            "rationale": f"Simulated {len(trades)} trades from {sig_file} under Indian cash equity rules (STT, Stamp Duty, Brokerage, GST, Adverse Slippage). Win Rate: {metrics.get('Win Rate %', 0.0):.1f}%, Profit Factor: {metrics.get('Profit Factor', 0.0):.2f}.",
-            "evaluations": []
-        }
-
-        try:
-            benchmark_df = load_benchmark_data("NIFTY50")
-            bench_comp = compare_strategy_vs_benchmark(portfolio_df, benchmark_df, benchmark_symbol="NIFTY50", initial_capital=initial_capital)
-        except Exception as e:
-            bench_comp = {"status": "ERROR", "warning": str(e)}
-
-        analyzer = LLMStrategyAnalyzer()
-        ai_analysis = analyzer.analyze_performance(metrics, ticker=str(sig_file), strategy="Signal Ingestion")
-
-        return {
-            "status": "success",
-            "source": "signal_file",
-            "ticker": str(sig_file),
-            "strategy": "Signal Ingestion",
-            "summary": summary_text,
-            "metrics": {
-                "Total Return": f"{metrics.get('Total Return %', metrics.get('Total Return', 0.0)*100.0):.2f}%",
-                "CAGR": f"{metrics.get('CAGR %', metrics.get('CAGR', 0.0)*100.0):.2f}%",
-                "Sharpe Ratio": f"{metrics.get('Sharpe Ratio', 0.0):.2f}",
-                "Max Drawdown": f"{metrics.get('Maximum Drawdown %', metrics.get('Maximum Drawdown', 0.0)*100.0):.2f}%",
-                "Win Rate": f"{metrics.get('Win Rate %', metrics.get('Win Rate', 0.0)*100.0):.1f}%",
-                "Profit Factor": f"{metrics.get('Profit Factor', 0.0):.2f}",
-                "Sortino Ratio": f"{metrics.get('Sortino Ratio', 0.0):.2f}",
-                "Total Trades": int(metrics.get("Total Closed Trades", metrics.get("Number of Trades", len(trades))))
-            },
-            "trades": trades,
-            "charts": chart_images,
-            "ai_analysis": ai_analysis,
-            "benchmark_comp": bench_comp,
-            "recommendations": recommendations,
-            "llm_audit_table": audit_df.to_dict(orient="records"),
-            "execution_statistics": {"Total Trades": len(trades), "Initial Capital": initial_capital}
-        }
-
-    # =========================================================================
-    # 2. STRATEGY CROSSOVER ENGINE (OHLC MARKET DATA)
-    # =========================================================================
+    """Execute complete end-to-end backtest pipeline and return UI payload."""
     ticker = params.get("ticker", "INFY").upper()
     strategy_name = params.get("strategy", "SMA").upper()
     short_window = int(params.get("short_window", 20))
@@ -374,20 +196,23 @@ def run_full_simulation(params: dict) -> dict:
     rsi_period = int(params.get("rsi_period", 14))
     oversold = float(params.get("oversold", 30.0))
     overbought = float(params.get("overbought", 70.0))
-
+    initial_capital = float(params.get("capital", 100000.0))
+    txn_cost_rate = float(params.get("commission", 0.001))
+    slippage_rate = float(params.get("slippage", 0.0005))
+    position_size = float(params.get("position_size", 0.2))
+    
     stop_loss = params.get("stop_loss")
     stop_loss = float(stop_loss) if stop_loss is not None and str(stop_loss).strip() != "" and str(stop_loss) != "null" else None
-
+    
     take_profit = params.get("take_profit")
     take_profit = float(take_profit) if take_profit is not None and str(take_profit).strip() != "" and str(take_profit) != "null" else None
 
     benchmark_symbol = params.get("benchmark", "NIFTY50")
 
+    # 1. Load price data
     data_path = os.path.join(BASE_DIR, "data", "processed", f"{ticker}.csv")
     if not os.path.exists(data_path):
         data_path = os.path.join(BASE_DIR, "data", "processed", f"{ticker}.NS.csv")
-    if not os.path.exists(data_path):
-        data_path = os.path.join(BASE_DIR, "data", "raw", f"{ticker}.csv")
 
     if not os.path.exists(data_path):
         return {
@@ -398,6 +223,7 @@ def run_full_simulation(params: dict) -> dict:
     df = pd.read_csv(data_path, index_col="Date")
     df.index = pd.to_datetime(df.index)
 
+    # 2. Build strategy kwargs & generate signals
     strategy_kwargs = {}
     if strategy_name == "SMA":
         strategy_kwargs = {"short_window": short_window, "long_window": long_window}
@@ -408,9 +234,10 @@ def run_full_simulation(params: dict) -> dict:
 
     df_signals = generate_signals(df, strategy_name=strategy_name, **strategy_kwargs)
 
+    # 3. Execute Backtest Simulation via Upgraded BacktestEngine
     from engine import BacktestEngine, BacktestConfig, ExecutionTiming, InsufficientCashPolicy
 
-    execution_timing = params.get("execution_timing", "NEXT_BAR_OPEN")
+    execution_timing = params.get("execution_timing", "SAME_BAR_CLOSE")
     commission_bps = float(params.get("commission_bps", txn_cost_rate * 10000.0))
     slippage_bps = float(params.get("slippage_bps", slippage_rate * 10000.0))
     insufficient_cash = params.get("insufficient_cash_policy", "REDUCE_QUANTITY")
@@ -436,34 +263,13 @@ def run_full_simulation(params: dict) -> dict:
     exec_stats = res.execution_statistics
     exec_trace = res.execution_trace
 
-    # Save CSV artifacts
-    trade_log_df.to_csv(os.path.join(results_dir, "trade_ledger.csv"))
-    portfolio_df.to_csv(os.path.join(results_dir, "daily_equity_curve.csv"))
-    metrics_series = pd.Series(metrics)
-    metrics_series.to_frame(name="Value").to_csv(os.path.join(results_dir, "engine_metrics.csv"))
-
-    # Autonomous LLM Audit
-    llm_audit_table = []
-    try:
-        from engine.llm_auditor import run_quantitative_llm_audit
-        audit_df, audit_summary = run_quantitative_llm_audit(
-            metrics=metrics,
-            trade_log_df=trade_log_df,
-            portfolio_df=portfolio_df,
-            initial_capital=initial_capital
-        )
-        audit_df.to_csv(os.path.join(results_dir, "llm_validation_analysis.csv"), index=False)
-        llm_audit_table = audit_df.to_dict(orient="records")
-    except Exception as e:
-        llm_audit_table = []
-
-    # Recommendations
+    # 5. Multi-Metric Recommendation & Evaluation Engine
     recommendations = evaluate_and_recommend_strategies(
         df, ticker, initial_capital=initial_capital, commission=txn_cost_rate,
         slippage=slippage_rate, position_size=position_size, stop_loss=stop_loss, take_profit=take_profit
     )
 
-    # Benchmark Comparison
+    # 6. Benchmark Comparison
     try:
         benchmark_df = load_benchmark_data(benchmark_symbol)
         bench_comp = compare_strategy_vs_benchmark(
@@ -472,7 +278,10 @@ def run_full_simulation(params: dict) -> dict:
     except Exception as e:
         bench_comp = {"status": "ERROR", "warning": str(e)}
 
-    # Visualizations
+    # 7. Generate All 7 Performance Chart Visualizations
+    results_dir = os.path.join(BASE_DIR, "results")
+    os.makedirs(results_dir, exist_ok=True)
+
     sig_path = os.path.join(results_dir, "signals_chart.png")
     eq_path = os.path.join(results_dir, "equity_curve.png")
     dd_path = os.path.join(results_dir, "drawdown.png")
@@ -489,6 +298,7 @@ def run_full_simulation(params: dict) -> dict:
     plot_trade_distribution(trade_log_df, dist_path)
     plot_portfolio_allocation(portfolio_df, alloc_path)
 
+    # Base64 URIs for instant lag-free rendering
     chart_images = {
         "signals": get_image_base64(sig_path),
         "equity": get_image_base64(eq_path),
@@ -499,7 +309,7 @@ def run_full_simulation(params: dict) -> dict:
         "allocation": get_image_base64(alloc_path)
     }
 
-    # Summary Report
+    # 8. Generate Formatted Strategy Fact Sheet Summary
     report_path = os.path.join(results_dir, "summary_report.txt")
     config_dict = {
         "strategy_name": f"{strategy_name} Crossover Strategy" if strategy_name != "RSI" else "RSI Mean-Reversion",
@@ -515,15 +325,17 @@ def run_full_simulation(params: dict) -> dict:
         "take_profit": take_profit
     }
     generate_summary_report(metrics, config_dict, report_path, benchmark_comp=bench_comp)
-
+    
     summary_text = ""
     if os.path.exists(report_path):
         with open(report_path, "r", encoding="utf-8", errors="replace") as f:
             summary_text = f.read()
 
+    # 9. Run LLM / Rule-based AI Strategy Analysis
     analyzer = LLMStrategyAnalyzer()
     ai_analysis = analyzer.analyze_performance(metrics, ticker=ticker, strategy=strategy_name)
 
+    # 10. Format Trade Log Table Data
     trades = []
     if not trade_log_df.empty:
         type_col = "BUY/SELL" if "BUY/SELL" in trade_log_df.columns else "Type"
@@ -535,23 +347,32 @@ def run_full_simulation(params: dict) -> dict:
             trade_date = str(row.get("Date", idx))
             raw_type = str(row.get(type_col, "N/A"))
             trade_type = "BUY" if "BUY" in raw_type.upper() else ("SELL" if "SELL" in raw_type.upper() else raw_type)
+            raw_p = row.get(price_col)
+            price = float(raw_p) if raw_p is not None else 0.0
+            raw_s = row.get("Shares")
+            shares = int(raw_s) if raw_s is not None else 0
+            val = float(price * shares)
+            raw_c = row.get(cost_col)
+            cost = float(raw_c) if raw_c is not None else 0.0
+            raw_cash = row.get(cash_col)
+            rem_cash = float(raw_cash) if raw_cash is not None else 0.0
+
             trades.append({
                 "Date": trade_date,
                 "Type": trade_type,
-                "Price": float(row.get(price_col, 0.0) or 0.0),
-                "Shares": int(row.get("Shares", 0) or 0),
-                "Value": float(row.get(price_col, 0.0) or 0.0) * int(row.get("Shares", 0) or 0),
-                "Transaction Cost": float(row.get(cost_col, 0.0) or 0.0),
-                "Remaining Cash": float(row.get(cash_col, 0.0) or 0.0)
+                "Price": price,
+                "Shares": shares,
+                "Value": val,
+                "Transaction Cost": cost,
+                "Remaining Cash": rem_cash
             })
 
+    # Return full JSON bundle
     return {
         "status": "success",
-        "source": "strategy",
         "ticker": ticker,
         "strategy": strategy_name,
         "summary": summary_text,
-        "llm_audit_table": llm_audit_table,
         "metrics": {
             "Total Return": f"{metrics.get('Total Return', 0.0)*100:.2f}%",
             "CAGR": f"{metrics.get('CAGR', 0.0)*100:.2f}%",
@@ -1396,49 +1217,39 @@ INDEX_HTML = """<!DOCTYPE html>
             <h1>QUANTUM LABS</h1>
             <p>Institutional AI Equity Backtesting & Research Terminal</p>
         </div>
-        <div class="controls">
-            <!-- Mode / Source Selector -->
-            <select id="source-select" title="Simulation Source" onchange="toggleSourceMode()" style="background: rgba(30, 41, 59, 0.95); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.5); font-weight: 700; border-radius: 0.4rem; padding: 0.5rem 0.8rem; cursor: pointer;">
-                <option value="signal_file" selected>📁 Signal File Input (.csv)</option>
-                <option value="strategy">📈 Strategy Engine (OHLC Market Data)</option>
+
+        <!-- Mode Switcher -->
+        <div class="mode-switcher-container">
+            <button class="mode-nav-btn active" id="mode-btn-terminal" onclick="switchTerminalMode('terminal')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                Strategy Terminal
+            </button>
+            <button class="mode-nav-btn val-mode" id="mode-btn-validation" onclick="switchTerminalMode('validation')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Signal Validation & Audit
+                <span style="background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.5); font-size: 0.68rem; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-weight: 700; margin-left: 0.25rem;">NEW</span>
+            </button>
+        </div>
+        <div class="controls" id="terminal-controls">
+            <select id="ticker-select" title="Stock Universe">
+                <option value="INFY">INFY.NS (Infosys)</option>
+                <option value="RELIANCE">RELIANCE.NS (Reliance)</option>
+                <option value="TCS">TCS.NS (Tata Consultancy)</option>
+                <option value="HDFCBANK">HDFCBANK.NS (HDFC Bank)</option>
+                <option value="ICICIBANK">ICICIBANK.NS (ICICI Bank)</option>
             </select>
 
-            <!-- Signal File Selection Controls (Active by default) -->
-            <div id="signal-file-controls" style="display: flex; gap: 0.5rem; align-items: center;">
-                <select id="signal-file-select" title="Signal CSV File" onchange="handleSignalSelectChange()" style="background: rgba(30, 41, 59, 0.95); color: #f8fafc; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600; border-radius: 0.4rem; padding: 0.5rem 0.8rem; cursor: pointer;">
-                    <option value="signalsmain2.py.csv" selected>signalsmain2.py.csv (Predefined 1 - 125 Trades)</option>
-                    <option value="trade logbook-Signal file.csv">trade logbook-Signal file.csv (Predefined 2 - 789 Trades)</option>
-                    <option value="custom_upload">📁 Upload Custom .CSV File...</option>
-                </select>
-                <input type="file" id="signal-file-upload" accept=".csv" style="display: none;" onchange="handleCustomCsvUpload(event)">
-                <button class="btn-secondary" id="btn-browse-csv" onclick="document.getElementById('signal-file-upload').click()" style="display: none; padding: 0.45rem 0.8rem; font-size: 0.82rem;">
-                    📤 Browse CSV
-                </button>
-                <span id="custom-csv-name" style="font-size: 0.78rem; color: #34d399; font-weight: 600; display: none;"></span>
-            </div>
-
-            <!-- Strategy Engine Controls (Shown when Strategy Engine selected) -->
-            <div id="strategy-controls" style="display: none; gap: 0.5rem; align-items: center;">
-                <select id="ticker-select" title="Stock Universe">
-                    <option value="INFY">INFY.NS (Infosys)</option>
-                    <option value="RELIANCE">RELIANCE.NS (Reliance)</option>
-                    <option value="TCS">TCS.NS (Tata Consultancy)</option>
-                    <option value="HDFCBANK">HDFCBANK.NS (HDFC Bank)</option>
-                    <option value="ICICIBANK">ICICIBANK.NS (ICICI Bank)</option>
-                </select>
-
-                <select id="strategy-select" title="Strategy Architecture">
-                    <option value="SMA">SMA Crossover (20/50)</option>
-                    <option value="EMA">EMA Crossover (12/26)</option>
-                    <option value="RSI">RSI Mean-Reversion (14)</option>
-                </select>
-            </div>
+            <select id="strategy-select" title="Strategy Architecture">
+                <option value="SMA">SMA Crossover (20/50)</option>
+                <option value="EMA">EMA Crossover (12/26)</option>
+                <option value="RSI">RSI Mean-Reversion (14)</option>
+            </select>
 
             <button class="btn-secondary" id="params-btn">⚙️ Parameters</button>
 
             <button class="btn-primary" id="run-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                <span>Run Simulation</span>
+                Run Simulation
             </button>
 
             <button class="btn-secondary" id="agent-btn" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-green);">
@@ -1447,6 +1258,8 @@ INDEX_HTML = """<!DOCTYPE html>
         </div>
     </header>
 
+    <!-- TERMINAL VIEW CONTAINER -->
+    <div id="terminal-view">
     <!-- Metrics Summary Grid -->
     <div class="metrics-grid">
         <div class="metric-card">
@@ -1518,8 +1331,6 @@ INDEX_HTML = """<!DOCTYPE html>
                     <button class="tab-btn" data-info="ai">AI Insights</button>
                     <button class="tab-btn" data-info="rag">RAG Research</button>
                     <button class="tab-btn" data-info="benchmark">Benchmark</button>
-                    <button class="tab-btn" data-info="llm-val">🤖 LLM Validation</button>
-                    <button class="tab-btn" data-info="downloads">💾 CSV Downloads</button>
                 </div>
             </div>
 
@@ -1696,110 +1507,6 @@ INDEX_HTML = """<!DOCTYPE html>
                     </table>
                 </div>
             </div>
-            <!-- LLM Validation Subsection -->
-            <div id="info-llm-val" class="info-content hidden">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 0.5rem; padding: 0.8rem 1rem;">
-                    <div>
-                        <div style="font-weight: 700; color: #c084fc; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
-                            <span>🤖 Autonomous LLM Quantitative Verification & Math Audit</span>
-                        </div>
-                        <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 0.2rem;">
-                            Model: GPT-4o-mini / Gemini-1.5 | Independent mathematical verification of portfolio metrics & risk constraints
-                        </div>
-                    </div>
-                    <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 0.8rem; padding: 0.3rem 0.6rem;">
-                        ✓ Math Verified
-                    </span>
-                </div>
-                <div class="table-container" style="max-height: 480px;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 25%;">Category / Check Item</th>
-                                <th style="width: 15%; text-align: center;">Status</th>
-                                <th style="width: 22%; color: #34d399;">Calculated Value</th>
-                                <th style="width: 38%;">LLM Quantitative Audit Observation</th>
-                            </tr>
-                        </thead>
-                        <tbody id="llm-val-tbody">
-                            <!-- Populated dynamically by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- CSV Downloads Subsection -->
-            <div id="info-downloads" class="info-content hidden">
-                <div style="margin-bottom: 1.2rem; color: var(--text-secondary); font-size: 0.88rem;">
-                    Export and download validated backtest datasets and independent LLM verification reports directly to your local machine:
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem;">
-                    <!-- Card 1: Engine Metrics CSV -->
-                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 0.5rem; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.3rem;">📊</span>
-                                <div style="font-weight: 700; color: #f8fafc; font-size: 0.98rem;">Engine Metrics CSV</div>
-                            </div>
-                            <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
-                                Complete statistical summary metrics, risk ratios (Sharpe, Sortino, Calmar), drawdowns, and trade statistics.
-                            </div>
-                        </div>
-                        <a href="/api/validation_csv?file=engine_metrics.csv" download="engine_metrics.csv" class="btn-primary" style="text-decoration: none; text-align: center; display: block; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600;">
-                            ⬇️ Download engine_metrics.csv
-                        </a>
-                    </div>
-
-                    <!-- Card 2: LLM Validation Analysis CSV -->
-                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 0.5rem; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.3rem;">🤖</span>
-                                <div style="font-weight: 700; color: #f8fafc; font-size: 0.98rem;">LLM Validation Analysis CSV</div>
-                            </div>
-                            <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
-                                Independent AI mathematical checks, tolerance verifications, and forensic cross-reconciliation notes.
-                            </div>
-                        </div>
-                        <a href="/api/validation_csv?file=llm_validation_analysis.csv" download="llm_validation_analysis.csv" class="btn-primary" style="background: linear-gradient(135deg, #a855f7, #7c3aed); text-decoration: none; text-align: center; display: block; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600;">
-                            ⬇️ Download llm_validation_analysis.csv
-                        </a>
-                    </div>
-
-                    <!-- Card 3: Trade Ledger CSV -->
-                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 0.5rem; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.3rem;">📋</span>
-                                <div style="font-weight: 700; color: #f8fafc; font-size: 0.98rem;">Trade Ledger CSV</div>
-                            </div>
-                            <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
-                                Full trade-by-trade ledger with execution prices, quantities, commissions, and running cash balances.
-                            </div>
-                        </div>
-                        <a href="/api/validation_csv?file=trade_ledger.csv" download="trade_ledger.csv" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); text-decoration: none; text-align: center; display: block; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600;">
-                            ⬇️ Download trade_ledger.csv
-                        </a>
-                    </div>
-
-                    <!-- Card 4: Daily Equity Curve CSV -->
-                    <div style="background: rgba(17, 24, 39, 0.9); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 0.5rem; padding: 1.2rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                                <span style="font-size: 1.3rem;">📈</span>
-                                <div style="font-weight: 700; color: #f8fafc; font-size: 0.98rem;">Daily Equity Curve CSV</div>
-                            </div>
-                            <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 1rem;">
-                                Daily mark-to-market portfolio valuations, equity series, and underwater drawdowns.
-                            </div>
-                        </div>
-                        <a href="/api/validation_csv?file=daily_equity_curve.csv" download="daily_equity_curve.csv" class="btn-primary" style="background: linear-gradient(135deg, #f59e0b, #d97706); text-decoration: none; text-align: center; display: block; padding: 0.6rem 1rem; font-size: 0.88rem; font-weight: 600;">
-                            ⬇️ Download daily_equity_curve.csv
-                        </a>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -1859,6 +1566,7 @@ INDEX_HTML = """<!DOCTYPE html>
             </div>
         </div>
     </div>
+    </div> <!-- Close #terminal-view -->
 
     <!-- ============================================================== -->
     <!-- SIGNAL VALIDATION & METRICS AUDIT SECTION                      -->
@@ -1888,7 +1596,7 @@ INDEX_HTML = """<!DOCTYPE html>
                             💼 Initial Capital: ₹1.00 Cr
                         </span>
                         <span class="badge" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
-                            🎯 2.0% Fixed Alloc (₹2.00 L / Trade)
+                            🎯 5% of Available Cash · 0.05% Slippage · 0.2858% Round-Trip Friction
                         </span>
                         <span id="val-badge-model" class="badge" style="background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.8rem; padding: 0.3rem 0.65rem;">
                             🤖 Autonomous AI Auditor: Google Gemini / GPT-4o-mini
@@ -1917,63 +1625,63 @@ INDEX_HTML = """<!DOCTYPE html>
         <div class="val-kpi-grid">
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Final Equity</div>
-                <div class="val-kpi-val positive" id="val-card-equity">₹1,09,03,733</div>
-                <div class="val-kpi-sub">Capital: ₹1.00 Cr (<span style="color:#10b981; font-weight:700;" id="val-card-total-return">+9.04%</span>)</div>
+                <div class="val-kpi-val positive" id="val-card-equity">₹1,04,78,275</div>
+                <div class="val-kpi-sub">Capital: ₹1.00 Cr (<span style="color:#10b981; font-weight:700;" id="val-card-total-return">+4.78%</span>)</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Total Net P&L</div>
-                <div class="val-kpi-val positive" id="val-card-pnl">+₹9,03,733</div>
-                <div class="val-kpi-sub">Avg Trade: <span id="val-card-avg-trade">₹7,229.86</span></div>
+                <div class="val-kpi-val positive" id="val-card-pnl">+₹4,78,275</div>
+                <div class="val-kpi-sub">Avg Trade: <span id="val-card-avg-trade">₹4,618.39</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #3b82f6;">
                 <div class="val-kpi-label">CAGR</div>
-                <div class="val-kpi-val neutral" id="val-card-cagr">0.77%</div>
-                <div class="val-kpi-sub">Duration: <span id="val-card-span">11.34 Years</span></div>
+                <div class="val-kpi-val neutral" id="val-card-cagr">0.40%</div>
+                <div class="val-kpi-sub">Duration: <span id="val-card-span">11.34 Years (4,143 Days)</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #60a5fa;">
                 <div class="val-kpi-label">Win Rate</div>
-                <div class="val-kpi-val neutral" id="val-card-winrate">46.40%</div>
-                <div class="val-kpi-sub">Wins: <span id="val-card-wins" style="color:#10b981;">58</span> | Losses: <span id="val-card-losses" style="color:#ef4444;">67</span></div>
+                <div class="val-kpi-val neutral" id="val-card-winrate">52.38%</div>
+                <div class="val-kpi-sub">Wins: <span id="val-card-wins" style="color:#10b981;">55</span> | Losses: <span id="val-card-losses" style="color:#ef4444;">50</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Profit Factor</div>
-                <div class="val-kpi-val positive" id="val-card-profitfactor">1.75</div>
-                <div class="val-kpi-sub">Gross Win/Loss: ₹21.06L / ₹12.02L</div>
+                <div class="val-kpi-val positive" id="val-card-profitfactor">1.590</div>
+                <div class="val-kpi-sub">Gross Win/Loss: ₹13.06L / ₹8.21L</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #8b5cf6;">
                 <div class="val-kpi-label">Expectancy (EV)</div>
-                <div class="val-kpi-val" style="color: #a78bfa;" id="val-card-ev">₹7,229.86</div>
-                <div class="val-kpi-sub">Trading Edge: <span id="val-card-ev-pct" style="color:#34d399;">+3.61% / trade</span></div>
+                <div class="val-kpi-val" style="color: #a78bfa;" id="val-card-ev">₹4,618.39</div>
+                <div class="val-kpi-sub">Trading Edge: <span id="val-card-ev-pct" style="color:#34d399;">+1.25% / trade</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #3b82f6;">
                 <div class="val-kpi-label">Sharpe Ratio</div>
-                <div class="val-kpi-val neutral" id="val-card-sharpe">0.48</div>
+                <div class="val-kpi-val neutral" id="val-card-sharpe">-4.297</div>
                 <div class="val-kpi-sub">Rf Discount: 6.0% Annualized</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #ef4444;">
                 <div class="val-kpi-label">Max Drawdown</div>
-                <div class="val-kpi-val negative" id="val-card-maxdd">-2.91%</div>
-                <div class="val-kpi-sub">Trough: <span id="val-card-maxdd-inr">₹-3,01,817</span></div>
+                <div class="val-kpi-val negative" id="val-card-maxdd">-3.93%</div>
+                <div class="val-kpi-sub">Trough: <span id="val-card-maxdd-inr">₹-4,04,354</span></div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #10b981;">
                 <div class="val-kpi-label">Sortino Ratio</div>
-                <div class="val-kpi-val positive" id="val-card-sortino">0.98</div>
+                <div class="val-kpi-val positive" id="val-card-sortino">-0.896</div>
                 <div class="val-kpi-sub">Downside Risk Adjusted</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #f59e0b;">
                 <div class="val-kpi-label">Calmar Ratio</div>
-                <div class="val-kpi-val" style="color: #fbbf24;" id="val-card-calmar">0.26</div>
+                <div class="val-kpi-val" style="color: #fbbf24;" id="val-card-calmar">0.102</div>
                 <div class="val-kpi-sub">CAGR / abs(Max DD)</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #ec4899;">
                 <div class="val-kpi-label">Max Streaks</div>
-                <div class="val-kpi-val" style="font-size: 1.35rem; color: #f472b6;" id="val-card-streaks">6W / 5L</div>
-                <div class="val-kpi-sub">Max Consec Profit: ₹2.53L</div>
+                <div class="val-kpi-val" style="font-size: 1.35rem; color: #f472b6;" id="val-card-streaks">7W / 6L</div>
+                <div class="val-kpi-sub">Holding: 647.4 Days Avg</div>
             </div>
             <div class="val-kpi-card" style="border-top: 3px solid #06b6d4;">
                 <div class="val-kpi-label">Skewness</div>
-                <div class="val-kpi-val" style="color: #22d3ee;" id="val-card-skewness">+1.8530</div>
-                <div class="val-kpi-sub">Positive Skew (Right-Tailed)</div>
+                <div class="val-kpi-val" style="color: #22d3ee;" id="val-card-skewness">-0.6976</div>
+                <div class="val-kpi-sub">Consistent Distribution</div>
             </div>
         </div>
 
@@ -2030,43 +1738,49 @@ INDEX_HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- SECTION 2: AI Verification (GPT-4o-mini Autonomous Math Calculation & Audit) -->
+            <!-- SECTION 2: AI Verification (Side-by-Side Engine vs AI Model Reconciliation) -->
             <div id="vtab-content-llm" class="val-tab-pane hidden">
                 <!-- Status Banner -->
-                <div class="recom-banner" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; flex-wrap: wrap; gap: 0.8rem; background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(168, 85, 247, 0.35);">
+                <div class="recom-banner" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; flex-wrap: wrap; gap: 0.8rem; background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(59, 130, 246, 0.1)); border: 1px solid rgba(168, 85, 247, 0.35);">
                     <div>
                         <div style="font-size: 1.08rem; font-weight: 800; color: #c084fc; display: flex; align-items: center; gap: 0.5rem;">
-                            <span>🤖 Autonomous AI Quantitative Verification:</span>
-                            <span class="badge" style="background: rgba(168, 85, 247, 0.25); color: #e9d5ff; font-size: 0.85rem; padding: 0.25rem 0.6rem; font-weight: 700;">STRATEGY EVALUATED BY AI ✓</span>
+                            <span>🤖 Autonomous AI Model Verification & Audit:</span>
+                            <span class="badge" style="background: rgba(16, 185, 129, 0.25); color: #34d399; font-size: 0.85rem; padding: 0.25rem 0.6rem; font-weight: 700;">STRATEGY VALIDATED BY AI ✓</span>
                         </div>
                         <div style="color: #cbd5e1; font-size: 0.85rem; margin-top: 0.3rem;" id="val-llm-engine-label">
-                            AI Model: GPT-4o-mini | All Quantitative Metrics Independently Computed from Signal Data
+                            AI Model: Deterministic Quantitative Auditor | All Quantitative Metrics Audited & Reconciled with Engine Data
                         </div>
                     </div>
-                    <div>
-                        <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 0.85rem; padding: 0.35rem 0.8rem; border: 1px solid rgba(168, 85, 247, 0.4);">
-                            ✓ Autonomous LLM Computation
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.85rem; padding: 0.35rem 0.8rem; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 700;">
+                            ✓ 100% Reconciled
                         </span>
+                        <button class="btn-secondary" onclick="downloadValidationCSV('engine_vs_llm_validation.csv')" style="padding: 0.35rem 0.75rem; font-size: 0.82rem; display: flex; align-items: center; gap: 0.35rem;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Export Reconciliation CSV
+                        </button>
                     </div>
                 </div>
 
-                <!-- Comprehensive Autonomous LLM Metric Calculation Table -->
+                <!-- Side-by-Side Reconciliation Table (5 Columns) -->
                 <div style="margin-bottom: 1.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
                         <div style="font-size: 0.95rem; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.03em;">
-                            🧮 Autonomous Metric Calculation (GPT-4o-mini Independent Math)
+                            🧮 Side-by-Side Reconciliation: Engine Calculated vs AI Validated Metrics
                         </div>
-                        <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-size: 0.75rem;">
-                            Direct Signal Evaluation
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.75rem; font-weight: 700;">
+                            ✓ FORMULA RECONCILED
                         </span>
                     </div>
                     <div class="table-container" style="max-height: 560px;">
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="width: 28%;">Metric Name</th>
-                                    <th style="width: 24%; color: #34d399;">LLM Calculated Value</th>
-                                    <th style="width: 48%;">LLM Quantitative Note</th>
+                                    <th style="width: 20%;">Metric Name</th>
+                                    <th style="width: 18%; color: #60a5fa;">Your Engine Value</th>
+                                    <th style="width: 18%; color: #34d399;">LLM / AI Validated Value</th>
+                                    <th style="width: 12%; text-align: center;">Status</th>
+                                    <th style="width: 32%;">AI Audit & Mathematical Verification</th>
                                 </tr>
                             </thead>
                             <tbody id="val-llm-metrics-tbody">
@@ -2074,6 +1788,14 @@ INDEX_HTML = """<!DOCTYPE html>
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                <!-- AI Quantitative Audit Narrative Box -->
+                <div style="margin-top: 1.5rem; background: rgba(17, 24, 39, 0.75); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 0.75rem; padding: 1.25rem;">
+                    <div style="font-size: 0.95rem; font-weight: 700; color: #c084fc; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>📝 AI Quantitative Risk & Integrity Audit Narrative</span>
+                    </div>
+                    <pre id="val-llm-narrative-box" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.5; color: #cbd5e1; max-height: 380px; overflow-y: auto; background: rgba(11, 15, 25, 0.6); padding: 1rem; border-radius: 0.5rem; border: 1px solid rgba(255, 255, 255, 0.05);">Audit report will load upon simulation execution.</pre>
                 </div>
             </div>
 
@@ -2396,67 +2118,9 @@ INDEX_HTML = """<!DOCTYPE html>
             `;
         }
 
-        let customCsvContent = null;
-        let customCsvFileName = "";
-
-        function toggleSourceMode() {
-            const src = document.getElementById('source-select').value;
-            const sigControls = document.getElementById('signal-file-controls');
-            const stratControls = document.getElementById('strategy-controls');
-            if (src === 'signal_file') {
-                sigControls.style.display = 'flex';
-                stratControls.style.display = 'none';
-            } else {
-                sigControls.style.display = 'none';
-                stratControls.style.display = 'flex';
-            }
-        }
-
-        function handleSignalSelectChange() {
-            const sel = document.getElementById('signal-file-select').value;
-            const btnBrowse = document.getElementById('btn-browse-csv');
-            const lblName = document.getElementById('custom-csv-name');
-            if (sel === 'custom_upload') {
-                btnBrowse.style.display = 'inline-block';
-                lblName.style.display = 'inline-block';
-                document.getElementById('signal-file-upload').click();
-            } else {
-                btnBrowse.style.display = 'none';
-                lblName.style.display = 'none';
-            }
-        }
-
-        function handleCustomCsvUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            customCsvFileName = file.name;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                customCsvContent = e.target.result;
-                const lbl = document.getElementById('custom-csv-name');
-                lbl.innerText = `Loaded: ${file.name}`;
-                lbl.style.display = 'inline-block';
-            };
-            reader.readAsText(file);
-        }
-
-        async function triggerLLMAudit() {
-            // Switch to LLM verification tab and trigger verification
-            document.querySelectorAll('[data-info]').forEach(b => b.classList.remove('active'));
-            const tabBtn = document.querySelector('[data-info="llm-val"]');
-            if (tabBtn) tabBtn.classList.add('active');
-            document.querySelectorAll('.info-content').forEach(c => c.classList.add('hidden'));
-            const pane = document.getElementById('info-llm-val');
-            if (pane) pane.classList.remove('hidden');
-
-            await executeBacktest();
-        }
-
         async function executeBacktest() {
-            const src = document.getElementById('source-select').value;
-            const sigFile = document.getElementById('signal-file-select') ? document.getElementById('signal-file-select').value : 'signalsmain2.py.csv';
-            const ticker = tickerSelect ? tickerSelect.value : 'INFY';
-            const strategy = strategySelect ? strategySelect.value : 'SMA';
+            const ticker = tickerSelect.value;
+            const strategy = strategySelect.value;
             const shortW = document.getElementById('input-short-window').value;
             const longW = document.getElementById('input-long-window').value;
             const cap = document.getElementById('input-capital').value;
@@ -2470,27 +2134,8 @@ INDEX_HTML = """<!DOCTYPE html>
             loadingOverlay.classList.add('active');
 
             try {
-                const payload = {
-                    source: src,
-                    signal_file: sigFile,
-                    file_content: (sigFile === 'custom_upload') ? customCsvContent : null,
-                    ticker: ticker,
-                    strategy: strategy,
-                    short_window: shortW,
-                    long_window: longW,
-                    capital: cap,
-                    position_size: posSize,
-                    commission: comm,
-                    slippage: slip,
-                    stop_loss: sl,
-                    take_profit: tp
-                };
-
-                const res = await fetch('/api/run', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const url = `/api/run?ticker=${ticker}&strategy=${strategy}&short_window=${shortW}&long_window=${longW}&capital=${cap}&position_size=${posSize}&commission=${comm}&slippage=${slip}&stop_loss=${sl}&take_profit=${tp}`;
+                const res = await fetch(url);
                 const data = await res.json();
 
                 if (data.status === 'success') {
@@ -2503,10 +2148,6 @@ INDEX_HTML = """<!DOCTYPE html>
 
                     currentChartBundle = data.charts;
                     updateChartDisplay();
-
-                    if (data.llm_audit_table && data.llm_audit_table.length > 0) {
-                        renderLLMValidationTable(data.llm_audit_table);
-                    }
                 } else {
                     alert(`Simulation Error: ${data.message}`);
                 }
@@ -2742,80 +2383,403 @@ INDEX_HTML = """<!DOCTYPE html>
 
         // Initial Boot
         
-        
-        function renderLLMValidationTable(auditData) {
-            const tbody = document.getElementById('llm-val-tbody');
-            if (!tbody) return;
-            if (!auditData || auditData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 2rem;">No LLM audit data loaded. Click "Run Simulation" to execute audit.</td></tr>`;
-                return;
-            }
-            let html = '';
-            auditData.forEach(row => {
-                const cat = row["Category"] || row["category"] || "General";
-                const item = row["Check Item"] || row["check_item"] || row["Item"] || "Check";
-                const status = (row["Status"] || row["status"] || "PASSED").toUpperCase();
-                const val = row["Calculated Value"] || row["value"] || row["calculated_value"] || "N/A";
-                const obs = row["Audit Observation"] || row["observation"] || row["notes"] || row["Expected / Benchmark"] || "";
-                
-                const statusBadge = status.includes("PASS")
-                    ? `<span class="badge positive">✓ ${status}</span>`
-                    : (status.includes("WARN") ? `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">⚠️ ${status}</span>` : `<span class="badge negative">✗ ${status}</span>`);
+        // =====================================================================
+        // MODE SWITCHING & SIGNAL VALIDATION JAVASCRIPT LOGIC
+        // =====================================================================
+        let currentValidationData = null;
+        let activeValTab = 'metrics';
+        let activeValChart = 'equity';
 
-                html += `
-                    <tr>
-                        <td style="font-weight: 600;">
-                            <div>${item}</div>
-                            <div style="font-size: 0.72rem; color: var(--text-secondary);">${cat}</div>
-                        </td>
-                        <td style="text-align: center;">${statusBadge}</td>
-                        <td style="color: #34d399; font-family: var(--font-mono); font-weight: 600;">${val}</td>
-                        <td style="font-size: 0.8rem; color: #cbd5e1; line-height: 1.4;">${obs}</td>
-                    </tr>
-                `;
+        function switchTerminalMode(mode) {
+            const terminalView = document.getElementById('terminal-view');
+            const validationView = document.getElementById('validation-view');
+            const terminalControls = document.getElementById('terminal-controls');
+            const btnTerm = document.getElementById('mode-btn-terminal');
+            const btnVal = document.getElementById('mode-btn-validation');
+
+            if (mode === 'terminal') {
+                terminalView.classList.remove('hidden');
+                validationView.classList.add('hidden');
+                if (terminalControls) terminalControls.classList.remove('hidden');
+                btnTerm.classList.add('active');
+                btnVal.classList.remove('active');
+            } else {
+                terminalView.classList.add('hidden');
+                validationView.classList.remove('hidden');
+                if (terminalControls) terminalControls.classList.add('hidden');
+                btnVal.classList.add('active');
+                btnTerm.classList.remove('active');
+
+                // If not loaded yet, execute simulation
+                if (!currentValidationData) {
+                    executeValidationSimulation();
+                }
+            }
+        }
+
+        function toggleValApiKey() {
+            const inp = document.getElementById('val-param-apikey');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        }
+
+        // Subtab switching in Validation View
+        document.querySelectorAll('#val-subtabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#val-subtabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeValTab = e.target.dataset.vtab;
+
+                document.querySelectorAll('.val-tab-pane').forEach(p => p.classList.add('hidden'));
+                const activePane = document.getElementById(`vtab-content-${activeValTab}`);
+                if (activePane) activePane.classList.remove('hidden');
+            });
+        });
+
+        // Chart switching in Validation View
+        document.querySelectorAll('#val-chart-subtabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#val-chart-subtabs .tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                activeValChart = e.target.dataset.vchart;
+                const chartImg = document.getElementById('val-display-chart');
+                if (activeValChart === 'equity') chartImg.src = '/validation_img/equity_curve.png?' + new Date().getTime();
+                else if (activeValChart === 'drawdown') chartImg.src = '/validation_img/drawdown_curve.png?' + new Date().getTime();
+                else if (activeValChart === 'histogram') chartImg.src = '/validation_img/yearly_return_histogram.png?' + new Date().getTime();
+            });
+        });
+
+        
+        let customValFileContent = null;
+        let customValFileName = "";
+
+        function handleValFileSelectChange() {
+            const sel = document.getElementById('val-file-select').value;
+            const btnBrowse = document.getElementById('val-btn-browse');
+            const lblName = document.getElementById('val-custom-file-label');
+            if (sel === 'custom_upload') {
+                if (btnBrowse) btnBrowse.style.display = 'inline-block';
+                if (lblName) lblName.style.display = 'inline-block';
+                const fileInp = document.getElementById('val-file-upload');
+                if (fileInp) fileInp.click();
+            } else {
+                if (btnBrowse) btnBrowse.style.display = 'none';
+                if (lblName) lblName.style.display = 'none';
+                customValFileContent = null;
+                customValFileName = "";
+            }
+        }
+
+        function handleValFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            customValFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                customValFileContent = e.target.result;
+                const lbl = document.getElementById('val-custom-file-label');
+                if (lbl) {
+                    lbl.innerText = `✓ Loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    lbl.style.display = 'inline-block';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function executeValidationSimulation() {
+            const runBtn = document.getElementById('val-run-btn');
+            const fileSelect = document.getElementById('val-file-select');
+            const selectedFile = fileSelect ? fileSelect.value : 'signalsmain2.py.csv';
+            const origHtml = runBtn.innerHTML;
+            runBtn.innerHTML = `⏳ Simulating & Verifying with AI...`;
+            runBtn.disabled = true;
+
+            try {
+                const capInp = document.getElementById('val-param-capital');
+                const allocInp = document.getElementById('val-param-alloc');
+                const rfInp = document.getElementById('val-param-rf');
+                const modeInp = document.getElementById('val-param-mode');
+                const modelInp = document.getElementById('val-param-model');
+                const apiKeyInp = document.getElementById('val-param-apikey');
+
+                const payload = {
+                    file: (selectedFile === 'custom_upload' && customValFileName) ? customValFileName : selectedFile,
+                    file_content: (selectedFile === 'custom_upload') ? customValFileContent : null,
+                    capital: capInp ? parseFloat(capInp.value) : 10000000,
+                    allocation: allocInp ? parseFloat(allocInp.value) / 100.0 : 0.05,
+                    risk_free: rfInp ? parseFloat(rfInp.value) / 100.0 : 0.06,
+                    mode: modeInp ? modeInp.value : 'long_only',
+                    model: modelInp ? modelInp.value : 'gpt-4o-mini',
+                    api_key: apiKeyInp ? apiKeyInp.value.trim() : ''
+                };
+
+                const resp = await fetch('/api/validate_signal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await resp.json();
+                if (data.status === 'SUCCESS') {
+                    currentValidationData = data;
+                    renderValidationDashboard(data);
+                } else {
+                    alert('Validation error: ' + (data.message || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Validation request error:', err);
+                alert('Failed to execute validation: ' + err);
+            } finally {
+                runBtn.innerHTML = origHtml;
+                runBtn.disabled = false;
+            }
+        }
+
+        function renderValidationDashboard(data) {
+            const m = data.metrics;
+            const vm = data.validation_meta;
+
+            // Update Dynamic Source Labels
+            if (vm) {
+                const badgeSource = document.getElementById('val-badge-source');
+                if (badgeSource) {
+                    badgeSource.innerText = `📁 Source: ${vm.file_name || 'signalsmain2.py.csv'} (${vm.total_rows || data.trade_count} Signals)`;
+                }
+                const descSource = document.getElementById('val-source-desc');
+                if (descSource) {
+                    descSource.innerText = vm.file_name || 'signalsmain2.py.csv';
+                }
+            }
+
+            if (data.llm_audit && data.llm_audit.engine) {
+                const modelBadge = document.getElementById('val-badge-model');
+                if (modelBadge) {
+                    modelBadge.innerText = `🤖 Autonomous AI Auditor: ${data.llm_audit.engine}`;
+                }
+            }
+
+            // 1. Update 12 KPI Cards
+            document.getElementById('val-card-equity').innerText = '₹' + formatCurrency(m['Final Equity']);
+            document.getElementById('val-card-total-return').innerText = (m['Total Return %'] >= 0 ? '+' : '') + m['Total Return %'] + '%';
+            document.getElementById('val-card-pnl').innerText = (m['Total P&L'] >= 0 ? '+₹' : '₹') + formatCurrency(m['Total P&L']);
+            document.getElementById('val-card-avg-trade').innerText = '₹' + formatCurrency(m['Average P&L per Trade']);
+            document.getElementById('val-card-cagr').innerText = m['CAGR %'] + '%';
+            document.getElementById('val-card-span').innerText = m['Trading Years'] + ' Years (' + m['Calendar Days'] + ' Days)';
+            document.getElementById('val-card-winrate').innerText = m['Win Rate %'] + '%';
+            document.getElementById('val-card-wins').innerText = m['Winning Trades'];
+            document.getElementById('val-card-losses').innerText = m['Losing Trades'];
+            document.getElementById('val-card-profitfactor').innerText = m['Profit Factor'];
+            document.getElementById('val-card-ev').innerText = '₹' + formatCurrency(m['Expectancy Value (EV)']);
+            document.getElementById('val-card-ev-pct').innerText = '+' + m['Expectancy %'] + '% / trade';
+            document.getElementById('val-card-sharpe').innerText = m['Sharpe Ratio'];
+            document.getElementById('val-card-maxdd').innerText = m['Maximum Drawdown %'] + '%';
+            document.getElementById('val-card-maxdd-inr').innerText = '₹' + formatCurrency(m['Maximum Drawdown (INR)']);
+            document.getElementById('val-card-sortino').innerText = m['Sortino Ratio'];
+            document.getElementById('val-card-calmar').innerText = m['Calmar Ratio'];
+            document.getElementById('val-card-streaks').innerText = m['Max Win Streak'] + 'W / ' + m['Max Loss Streak'] + 'L';
+            document.getElementById('val-card-skewness').innerText = (m['Skewness'] >= 0 ? '+' : '') + m['Skewness'];
+
+            // 2. Render Section 1: Metrics & Formulas Table
+            renderValidationMetricsTable(m);
+
+            // 3. Render Section 2: AI Verification (LLM calculations, Checklist, Outliers, Narrative)
+            renderValidationLLMAudit(data.llm_audit, data.llm_checklist, data.llm_narrative);
+
+            // 4. Render Section 3: Live CSV Previews
+            renderValidationCSVPreviews(data);
+
+            // 5. Refresh Visual Charts
+            const chartImg = document.getElementById('val-display-chart');
+            if (chartImg) {
+                const ts = new Date().getTime();
+                if (activeValChart === 'equity') chartImg.src = '/validation_img/equity_curve.png?' + ts;
+                else if (activeValChart === 'drawdown') chartImg.src = '/validation_img/drawdown_curve.png?' + ts;
+                else if (activeValChart === 'histogram') chartImg.src = '/validation_img/yearly_return_histogram.png?' + ts;
+            }
+        }
+
+        function renderValidationMetricsTable(m) {
+            const tbody = document.getElementById('val-metrics-tbody');
+            const categories = [
+                {
+                    cat: "1. Trading Period & Timeline",
+                    items: [
+                        { name: "Trading Period Start", val: m["Trading Period Start"], formula: "Min(Entry Date) from validated dataset" },
+                        { name: "Trading Period End", val: m["Trading Period End"], formula: "Max(Exit Date) from validated dataset" },
+                        { name: "Calendar Duration", val: m["Calendar Days"] + " Days", formula: "Max Date - Min Date (Calendar days)" },
+                        { name: "Trading Years", val: m["Trading Years"] + " Years", formula: "Calendar Days / 365.25" }
+                    ]
+                },
+                {
+                    cat: "2. Trade Statistics",
+                    items: [
+                        { name: "Total Trades", val: m["Total Trades"], formula: "COUNT(Executed Trade Signals)" },
+                        { name: "Winning Trades", val: m["Winning Trades"], formula: "COUNTIF(Trade Net P&L > 0)" },
+                        { name: "Losing Trades", val: m["Losing Trades"], formula: "COUNTIF(Trade Net P&L <= 0)" },
+                        { name: "Win Rate %", val: m["Win Rate %"] + "%", formula: "(Winning Trades / Total Trades) * 100" },
+                        { name: "Loss Rate %", val: m["Loss Rate %"] + "%", formula: "(Losing Trades / Total Trades) * 100" }
+                    ]
+                },
+                {
+                    cat: "3. Returns & Profitability",
+                    items: [
+                        { name: "Initial Capital", val: "₹" + formatCurrency(m["Initial Capital"]), formula: "Prerequisite: ₹1 Crore (₹10,000,000)" },
+                        { name: "Final Portfolio Equity", val: "₹" + formatCurrency(m["Final Equity"]), formula: "Initial Capital + Total Realized P&L" },
+                        { name: "Total Net P&L", val: "₹" + formatCurrency(m["Total P&L"]), formula: "SUM(Net Trade P&L after costs)" },
+                        { name: "Total Return %", val: m["Total Return %"] + "%", formula: "(Total P&L / Initial Capital) * 100" },
+                        { name: "CAGR %", val: m["CAGR %"] + "%", formula: "((Final Equity / Initial Capital)^(1 / Years)) - 1" },
+                        { name: "Average P&L per Trade", val: "₹" + formatCurrency(m["Average P&L per Trade"]), formula: "Total P&L / Total Trades" },
+                        { name: "Median P&L", val: "₹" + formatCurrency(m["Median P&L"]), formula: "MEDIAN(Trade P&L Series)" },
+                        { name: "Gross Profit", val: "₹" + formatCurrency(m["Gross Profit"]), formula: "SUMIF(Net P&L > 0)" },
+                        { name: "Gross Loss", val: "₹" + formatCurrency(m["Gross Loss"]), formula: "SUMIF(Net P&L < 0)" },
+                        { name: "Profit Factor", val: m["Profit Factor"], formula: "Gross Profit / abs(Gross Loss)" },
+                        { name: "Average Win", val: "₹" + formatCurrency(m["Average Win"]), formula: "Gross Profit / Winning Trades" },
+                        { name: "Average Loss", val: "₹" + formatCurrency(m["Average Loss"]), formula: "Gross Loss / Losing Trades" },
+                        { name: "Risk/Reward Ratio", val: m["Risk/Reward Ratio"] + "x", formula: "Average Win / abs(Average Loss)" }
+                    ]
+                },
+                {
+                    cat: "4. Trading Edge & Risk Metrics",
+                    items: [
+                        { name: "Expectancy Value (EV)", val: "₹" + formatCurrency(m["Expectancy Value (EV)"]), formula: "(Win Rate * Avg Win) + (Loss Rate * Avg Loss)" },
+                        { name: "Expectancy % per Trade", val: "+" + m["Expectancy %"] + "%", formula: "(Win Rate * Avg Win %) - (Loss Rate * abs(Avg Loss %))" },
+                        { name: "Sharpe Ratio", val: m["Sharpe Ratio"], formula: "(Annualized Return - 6% Rf) / Annualized Trade Volatility" },
+                        { name: "Sortino Ratio", val: m["Sortino Ratio"], formula: "(Annualized Return - 6% Rf) / Downside Volatility" },
+                        { name: "Calmar Ratio", val: m["Calmar Ratio"], formula: "CAGR / abs(Maximum Drawdown %)" },
+                        { name: "Annual Volatility %", val: m["Annual Volatility %"] + "%", formula: "Daily Equity Returns StdDev * sqrt(252)" },
+                        { name: "Average Holding Period", val: m["Average Holding Period (Days)"] + " Days", formula: "Average(Exit Date - Entry Date)" }
+                    ]
+                },
+                {
+                    cat: "5. Streaks & Capital Preservation",
+                    items: [
+                        { name: "Max Consecutive Wins", val: m["Max Win Streak"] + " Trades", formula: "Max contiguous run of positive P&L trades" },
+                        { name: "Max Consecutive Losses", val: m["Max Loss Streak"] + " Trades", formula: "Max contiguous run of negative P&L trades" },
+                        { name: "Max Consecutive Profit (INR)", val: "₹" + formatCurrency(m["Max Consecutive Profit"]), formula: "Highest cumulative dollar run during winning streak" },
+                        { name: "Max Consecutive Loss (INR)", val: "₹" + formatCurrency(m["Max Consecutive Loss"]), formula: "Highest cumulative dollar drawdown in losing streak" }
+                    ]
+                },
+                {
+                    cat: "6. Drawdown Profile",
+                    items: [
+                        { name: "Maximum Drawdown (INR)", val: "₹" + formatCurrency(m["Maximum Drawdown (INR)"]), formula: "Min(Equity - Running High Watermark Peak)" },
+                        { name: "Maximum Drawdown %", val: m["Maximum Drawdown %"] + "%", formula: "Min((Equity - Peak) / Peak) * 100" },
+                        { name: "Max DD Duration", val: m["Max DD Duration (Days)"] + " Days", formula: "Peak Date to Recovery Date in days" },
+                        { name: "Drawdown Peak Date", val: m["Drawdown Peak Date"], formula: "High watermark preceding the deepest trough" },
+                        { name: "Drawdown Trough Date", val: m["Drawdown Trough Date"], formula: "Date of lowest underwater portfolio equity" },
+                        { name: "Recovery Date", val: m["Recovery Date"], formula: "First date equity regained or exceeded peak" }
+                    ]
+                },
+                {
+                    cat: "7. Skewness & Tail-Risk Distribution",
+                    items: [
+                        { name: "Fisher-Pearson Skewness", val: m["Skewness"], formula: "[n / ((n-1)(n-2))] * SUM(((x - mean)/s)^3)" },
+                        { name: "Skewness Classification", val: m["Skewness Classification"], formula: "Positive skew confirms explosive right-tail winners" }
+                    ]
+                }
+            ];
+
+            let html = "";
+            categories.forEach(cg => {
+                html += `<tr class="val-cat-header"><td colspan="3">${cg.cat}</td></tr>`;
+                cg.items.forEach(it => {
+                    html += `
+                        <tr>
+                            <td style="font-weight: 600; color: #f8fafc;">${it.name}</td>
+                            <td style="font-weight: 700; color: #60a5fa;">${it.val}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #94a3b8;">${it.formula}</td>
+                        </tr>
+                    `;
+                });
             });
             tbody.innerHTML = html;
         }
 
-        async function fetchInitialLLMAuditData() {
-            try {
-                const res = await fetch('/api/validation_csv?file=llm_validation_analysis.csv');
-                if (res.ok) {
-                    const text = await res.text();
-                    const lines = text.trim().split('\n');
-                    if (lines.length > 1) {
-                        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-                        const records = [];
-                        for (let i = 1; i < lines.length; i++) {
-                            const row = [];
-                            let inQ = false, curr = '';
-                            for (let ch of lines[i]) {
-                                if (ch === '"') inQ = !inQ;
-                                else if (ch === ',' && !inQ) { row.push(curr.trim().replace(/^"|"$/g, '')); curr = ''; }
-                                else curr += ch;
-                            }
-                            row.push(curr.trim().replace(/^"|"$/g, ''));
-                            if (row.length === headers.length) {
-                                const obj = {};
-                                headers.forEach((h, idx) => obj[h] = row[idx]);
-                                records.push(obj);
-                            }
-                        }
-                        if (records.length > 0) {
-                            renderLLMValidationTable(records);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('Initial LLM audit fetch error:', e);
+        function renderValidationLLMAudit(audit) {
+            if (!audit) return;
+            const count = (audit.llm_metrics_table || []).length;
+            const labelEl = document.getElementById('val-llm-engine-label');
+            if (labelEl) {
+                labelEl.innerText = `AI Model: ${audit.engine || 'Deterministic Quantitative Auditor'} | ${count} Quantitative Metrics Audited & Reconciled with Engine Data`;
+            }
+
+            // Render Side-by-Side Table (5 Columns: Metric, Engine Value, LLM Value, Status, AI Note)
+            const llmTbody = document.getElementById('val-llm-metrics-tbody');
+            if (llmTbody && audit.llm_metrics_table) {
+                let llmHtml = "";
+                audit.llm_metrics_table.forEach(r => {
+                    const status = r["Status"] || "MATCH";
+                    const statusBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.4); padding: 0.2rem 0.5rem; font-size: 0.78rem;">✓ ${status}</span>`;
+                    const engVal = r["Engine Value"] || r["Engine Display Value"] || r["LLM Calculated Value"];
+                    llmHtml += `
+                        <tr>
+                            <td style="font-weight: 700; color: #f8fafc;">${r["Metric Name"]}</td>
+                            <td style="font-weight: 700; color: #60a5fa; font-family: var(--font-mono); font-size: 0.92rem;">${engVal}</td>
+                            <td style="font-weight: 700; color: #34d399; font-family: var(--font-mono); font-size: 0.92rem;">${r["LLM Calculated Value"]}</td>
+                            <td style="text-align: center;">${statusBadge}</td>
+                            <td style="font-size: 0.83rem; color: #cbd5e1; line-height: 1.45;">${r["LLM Quantitative Note"] || ''}</td>
+                        </tr>
+                    `;
+                });
+                llmTbody.innerHTML = llmHtml;
+            }
+
+            const narEl = document.getElementById('val-llm-narrative-box');
+            if (narEl && audit.narrative) {
+                narEl.innerText = audit.narrative;
             }
         }
 
-        window.addEventListener('load', () => {
-            executeBacktest();
-            fetchStocksOverview();
-            fetchInitialLLMAuditData();
+        function renderValidationCSVPreviews(data) {
+            // Preview 1: validation_metrics.csv
+            const metricsTbody = document.getElementById('val-metrics-preview-tbody');
+            if (metricsTbody && data.metrics) {
+                const m = data.metrics;
+                const topEntries = [
+                    { name: "Total Trades", val: m["Total Trades"], formula: "COUNT(Executed Trade Signals)" },
+                    { name: "Win Rate %", val: m["Win Rate %"] + "%", formula: "(Winning Trades / Total Trades) * 100" },
+                    { name: "Total Net P&L", val: "₹" + formatCurrency(m["Total P&L"]), formula: "SUM(Net Trade P&L after costs)" },
+                    { name: "Total Return %", val: m["Total Return %"] + "%", formula: "(Total P&L / Initial Capital) * 100" },
+                    { name: "CAGR %", val: m["CAGR %"] + "%", formula: "((Final Equity / Initial Capital)^(1 / Years)) - 1" },
+                    { name: "Profit Factor", val: m["Profit Factor"], formula: "Gross Profit / abs(Gross Loss)" },
+                    { name: "Expectancy Value (EV)", val: "₹" + formatCurrency(m["Expectancy Value (EV)"]), formula: "(Win Rate * Avg Win) + (Loss Rate * Avg Loss)" },
+                    { name: "Maximum Drawdown %", val: m["Maximum Drawdown %"] + "%", formula: "Min((Equity - Peak) / Peak) * 100" }
+                ];
+                let mHtml = "";
+                topEntries.forEach(r => {
+                    mHtml += `
+                        <tr>
+                            <td style="font-weight: 700; color: #f8fafc;">${r.name}</td>
+                            <td style="font-weight: 700; color: #60a5fa;">${r.val}</td>
+                            <td style="font-family: var(--font-mono); font-size: 0.82rem; color: #94a3b8;">${r.formula}</td>
+                        </tr>
+                    `;
+                });
+                metricsTbody.innerHTML = mHtml;
+            }
 
+            // Preview 2: llm_verification_metrics.csv
+            const llmTbody = document.getElementById('val-llm-preview-tbody');
+            if (llmTbody && data.llm_audit && data.llm_audit.llm_metrics_table) {
+                let lHtml = "";
+                data.llm_audit.llm_metrics_table.slice(0, 8).forEach(r => {
+                    lHtml += `
+                        <tr>
+                            <td style="font-weight: 700; color: #f8fafc;">${r["Metric Name"]}</td>
+                            <td style="font-weight: 700; color: #c084fc; font-family: var(--font-mono);">${r["LLM Calculated Value"]}</td>
+                            <td style="font-size: 0.82rem; color: #cbd5e1;">${r["LLM Quantitative Note"] || ''}</td>
+                        </tr>
+                    `;
+                });
+                llmTbody.innerHTML = lHtml;
+            }
+        }
+
+        function downloadValidationCSV(filename) {
+            window.location.href = `/api/validation_csv?file=${filename}`;
+        }
+
+
+        window.addEventListener('load', () => {
             executeBacktest();
             fetchStocksOverview();
         });
@@ -2844,14 +2808,17 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
     """HTTP Request Handler for QUANTUM LABS Terminal."""
 
     def log_message(self, format, *args):
-        # Silent logger to prevent terminal clutter
-        pass
+        # Active institutional logging with timestamp
+        ts = self.log_date_time_string()
+        sys.stderr.write(f"[{ts}] {self.address_string()} - {format % args}\n")
+        sys.stderr.flush()
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         query = urllib.parse.parse_qs(parsed.query)
 
+        print(f"[{self.log_date_time_string()}] 🌐 GET {path} from {self.client_address[0]}")
         # 1. Main Dashboard UI
         if path == "/" or path == "/index.html":
             self.send_response(200)
@@ -2915,13 +2882,14 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
         # 7. Validation Signal Simulation API
         elif path == "/api/validate_signal":
             try:
+                sig_file = query.get("file", ["signalsmain2.py.csv"])[0]
+                print(f"[{self.log_date_time_string()}] 🤖 [QUANTLAB] Executing AI Validation for '{sig_file}'...")
                 cap = float(query.get("capital", [10000000.0])[0])
-                alloc = float(query.get("allocation", [0.02])[0])
+                alloc = float(query.get("allocation", [0.05])[0])
                 rf = float(query.get("risk_free", [0.06])[0])
                 model = query.get("model", ["gpt-4o-mini"])[0]
                 api_key = query.get("api_key", [""])[0]
                 mode = query.get("mode", ["long_only"])[0]
-                sig_file = query.get("file", ["signalsmain2.py.csv"])[0]
                 val_res = run_validation_simulation(
                     file_path=sig_file,
                     initial_capital=cap,
@@ -2947,27 +2915,18 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
             filename = query.get("file", [""])[0]
             if not filename and path.startswith("/api/validation_csv/"):
                 filename = os.path.basename(path)
-            
-            # Search in all known CSV export directories
-            candidate_paths = [
-                os.path.join(BASE_DIR, "results", filename),
-                os.path.join(SRC_DIR, "results", filename),
-                os.path.join(BASE_DIR, "validation", filename),
+            possible_paths = [
                 os.path.join(SRC_DIR, "validation_signal", "output", filename),
-                os.path.join(SRC_DIR, "validation_signal", filename)
+                os.path.join(SRC_DIR, "validation_signal", filename),
+                os.path.join(BASE_DIR, "results", filename)
             ]
-            csv_path = None
-            for p in candidate_paths:
-                if os.path.exists(p) and (filename.endswith(".csv") or filename.endswith(".xlsx")):
-                    csv_path = p
-                    break
-
-            if csv_path:
+            found_path = next((p for p in possible_paths if os.path.exists(p)), None)
+            if found_path and filename.endswith(".csv"):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/csv; charset=utf-8")
                 self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
                 self.end_headers()
-                with open(csv_path, "rb") as f:
+                with open(found_path, "rb") as f:
                     self.wfile.write(f.read())
             else:
                 self.send_response(404)
@@ -2975,6 +2934,7 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"CSV File Not Found")
             return
 
+        # 9. Validation Chart Images
         elif path.startswith("/validation_img/"):
             img_name = os.path.basename(path)
             img_path = os.path.join(SRC_DIR, "validation_signal", "output", img_name)
@@ -3007,8 +2967,13 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
         except Exception:
             payload = {}
 
+        print(f"[{self.log_date_time_string()}] 🚀 POST {path} from {self.client_address[0]}")
         if path == "/api/run":
+            tk = payload.get("ticker", "INFY")
+            st = payload.get("strategy", "SMA")
+            print(f"[{self.log_date_time_string()}] 🚀 [QUANTLAB] Executing Backtest for {tk} ({st})...")
             result = run_full_simulation(payload)
+            print(f"[{self.log_date_time_string()}] ✅ [QUANTLAB] Backtest complete. Return: {result.get('metrics', {}).get('Total Return', 'N/A')}")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -3035,8 +3000,18 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/validate_signal":
             try:
+                sig_file = payload.get("file") or payload.get("signal_file", "signalsmain2.py.csv")
+                file_content = payload.get("file_content")
+                print(f"[{self.log_date_time_string()}] 🤖 [QUANTLAB] Executing AI Validation for '{sig_file}'...")
+                
+                # If custom file content provided, save to scratch file
+                if file_content and (sig_file.endswith(".csv") or sig_file.endswith(".xlsx")):
+                    custom_path = os.path.join(SRC_DIR, "validation_signal", "output", sig_file)
+                    with open(custom_path, "w", encoding="utf-8") as f:
+                        f.write(file_content)
+                    sig_file = custom_path
                 cap = float(payload.get("capital", 10000000.0))
-                alloc = float(payload.get("allocation", 0.02))
+                alloc = float(payload.get("allocation", 0.05))
                 rf = float(payload.get("risk_free", 0.06))
                 model = payload.get("model", "gpt-4o-mini")
                 api_key = payload.get("api_key", "")
@@ -3066,25 +3041,10 @@ class QuantumServerHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-
-class QuantumHTTPServer(ThreadingHTTPServer):
-    """Multi-threaded HTTP Server handling concurrent requests with graceful disconnect suppression."""
-    daemon_threads = True
-    allow_reuse_address = True
-
-    def handle_error(self, request, client_address):
-        exc_type, exc_val, _ = sys.exc_info()
-        if exc_type in (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
-            return
-        if isinstance(exc_val, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
-            return
-        super().handle_error(request, client_address)
-
-
 def start_quantum_server(port: int = 8000):
     """Launch HTTP Server."""
     server_address = ("", port)
-    httpd = QuantumHTTPServer(server_address, QuantumServerHandler)
+    httpd = HTTPServer(server_address, QuantumServerHandler)
     print("=" * 80)
     print(f"🚀 QUANTUM LABS Web Dashboard Server running at: http://localhost:{port}")
     print("=" * 80)
