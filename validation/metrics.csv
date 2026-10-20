@@ -1,0 +1,40 @@
+metric,value
+Trading Period (days),4143
+Start Date,2013-03-28 00:00:00
+End Date,2024-07-31 00:00:00
+Total Trades,695
+Win Trades,386
+Loss Trades,309
+Breakeven Trades,0
+Initial Capital,10000000.0
+Final Equity,20862740.0
+Total P&L,10862740.0
+Realized P&L,10862740.0
+Total Return (%),108.6274
+Average P&L per Trade,15629.841726618704
+Median P&L,3680.0
+CAGR (%),6.693201397550208
+Skewness,1.6390920246389982
+Win Rate (%),55.539568345323744
+Loss Rate (%),44.460431654676256
+Average Win,50384.87046632124
+Average Loss,-27785.825242718445
+Gross Profit,19448560.0
+Gross Loss,8585820.0
+Profit Factor (Gross Profit / Gross Loss),2.265195403584049
+Risk/Reward Ratio (Avg Win / |Avg Loss|),1.8133299992421532
+Expectancy Value,15629.841726618706
+Sharpe Ratio,0.4402308771859082
+Sortino Ratio,1.0400695715246338
+Calmar Ratio,0.5166582143110017
+Max Win Streak,12
+Max Loss Streak,13
+Maximum Drawdown (%),-12.954795282750009
+Maximum Drawdown (Rs),-2100120.0
+Max DD Duration (days),1371
+Drawdown Peak Date,2017-12-29 00:00:00
+Drawdown Peak Equity,16211140.0
+Drawdown Trough Date,2020-03-31 00:00:00
+Drawdown Trough Equity,14111020.0
+Drawdown Recovery Date,2021-09-30 00:00:00
+Longest Drawdown (days),1371

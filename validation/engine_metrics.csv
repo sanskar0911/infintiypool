@@ -1,0 +1,37 @@
+Metric Name,Calculated Value
+Initial Capital,10000000.0
+Final Equity,10132204.051932983
+Net Profit,132204.0519329831
+Total Return,0.013220405193298257
+Total Return %,1.3220405193298257
+CAGR,0.002630569183072806
+CAGR %,0.2630569183072806
+Calendar Days,1826.0
+Years,4.999315537303217
+Sharpe Ratio,0.2651786244557984
+Sortino Ratio,0.4006700290389714
+Annualized Volatility %,1.0289220819816738
+Downside Deviation,0.0004289768673679413
+Maximum Drawdown,-0.03120842627860777
+Maximum Drawdown %,-3.120842627860777
+Maximum Drawdown INR,-321326.8119335752
+Calmar Ratio,0.08429035029158022
+Total Closed Trades,16.0
+Winning Trades,5.0
+Losing Trades,11.0
+Even Trades,0.0
+Win Rate,0.3125
+Win Rate %,31.25
+Loss Rate %,68.75
+Gross Profit,381693.06547238637
+Gross Loss,249489.0135393999
+Profit Factor,1.5298992931891509
+Average Trade PnL,8262.753245811655
+Average Win,76338.61309447727
+Average Loss,22680.819412672718
+Expectancy (EV),8262.753245811655
+Max Win Streak,2.0
+Max Loss Streak,5.0
+Skewness,2.042032441056899
+Exposure,0.027402628155385182
+Turnover,0.0

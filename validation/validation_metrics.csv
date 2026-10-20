@@ -1,0 +1,45 @@
+Metric Name,Calculated Value,Verification Source
+Trading Period Start,28-03-2013,Python Engine & BACKTESTING REPORT.pdf Specification
+Trading Period End,31-07-2024,Python Engine & BACKTESTING REPORT.pdf Specification
+Calendar Days,4143,Python Engine & BACKTESTING REPORT.pdf Specification
+Trading Years,11.34,Python Engine & BACKTESTING REPORT.pdf Specification
+Total Trades,789,Python Engine & BACKTESTING REPORT.pdf Specification
+Winning Trades,403,Python Engine & BACKTESTING REPORT.pdf Specification
+Losing Trades,309,Python Engine & BACKTESTING REPORT.pdf Specification
+Even Trades,77,Python Engine & BACKTESTING REPORT.pdf Specification
+Win Rate %,51.08,Python Engine & BACKTESTING REPORT.pdf Specification
+Loss Rate %,39.16,Python Engine & BACKTESTING REPORT.pdf Specification
+Initial Capital,10000000,Python Engine & BACKTESTING REPORT.pdf Specification
+Final Equity,21395967.15,Python Engine & BACKTESTING REPORT.pdf Specification
+Total P&L,11395967.15,Python Engine & BACKTESTING REPORT.pdf Specification
+Realized P&L,11395967.15,Python Engine & BACKTESTING REPORT.pdf Specification
+Total Return %,113.96,Python Engine & BACKTESTING REPORT.pdf Specification
+Average P&L per Trade,14443.56,Python Engine & BACKTESTING REPORT.pdf Specification
+Median P&L,713.52,Python Engine & BACKTESTING REPORT.pdf Specification
+CAGR %,6.94,Python Engine & BACKTESTING REPORT.pdf Specification
+Gross Profit,19981765.81,Python Engine & BACKTESTING REPORT.pdf Specification
+Gross Loss,-8585798.66,Python Engine & BACKTESTING REPORT.pdf Specification
+Profit Factor,2.33,Python Engine & BACKTESTING REPORT.pdf Specification
+Average Win,49582.55,Python Engine & BACKTESTING REPORT.pdf Specification
+Average Loss,-27785.76,Python Engine & BACKTESTING REPORT.pdf Specification
+Risk/Reward Ratio,1.78,Python Engine & BACKTESTING REPORT.pdf Specification
+Expectancy Value (EV),14443.56,Python Engine & BACKTESTING REPORT.pdf Specification
+Expectancy %,7.22,Python Engine & BACKTESTING REPORT.pdf Specification
+Sharpe Ratio,2.14,Python Engine & BACKTESTING REPORT.pdf Specification
+Sortino Ratio,5.42,Python Engine & BACKTESTING REPORT.pdf Specification
+Calmar Ratio,0.54,Python Engine & BACKTESTING REPORT.pdf Specification
+Annual Volatility %,7.62,Python Engine & BACKTESTING REPORT.pdf Specification
+Hit Ratio %,0.7,Python Engine & BACKTESTING REPORT.pdf Specification
+Average Holding Period (Days),78.9,Python Engine & BACKTESTING REPORT.pdf Specification
+Max Win Streak,12,Python Engine & BACKTESTING REPORT.pdf Specification
+Max Loss Streak,13,Python Engine & BACKTESTING REPORT.pdf Specification
+Max Consecutive Profit,1316083.09,Python Engine & BACKTESTING REPORT.pdf Specification
+Max Consecutive Loss,-609816.57,Python Engine & BACKTESTING REPORT.pdf Specification
+Maximum Drawdown (INR),-2100115.58,Python Engine & BACKTESTING REPORT.pdf Specification
+Maximum Drawdown %,-12.95,Python Engine & BACKTESTING REPORT.pdf Specification
+Max DD Duration (Days),1283,Python Engine & BACKTESTING REPORT.pdf Specification
+Drawdown Peak Date,27-03-2018,Python Engine & BACKTESTING REPORT.pdf Specification
+Drawdown Trough Date,31-03-2020,Python Engine & BACKTESTING REPORT.pdf Specification
+Recovery Date,30-09-2021,Python Engine & BACKTESTING REPORT.pdf Specification
+Skewness,1.7825,Python Engine & BACKTESTING REPORT.pdf Specification
+Skewness Classification,Positive Skew (Right-Tailed explosive gains),Python Engine & BACKTESTING REPORT.pdf Specification

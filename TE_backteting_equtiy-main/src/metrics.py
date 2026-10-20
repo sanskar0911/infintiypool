@@ -1,26 +1,32 @@
 """
 metrics.py
 
-Comprehensive performance and risk metrics computation module.
-Computes Total Return, CAGR, Volatility, Sharpe Ratio, Sortino Ratio, Calmar Ratio,
-Max Drawdown, Win Rate, Profit Factor, Average Holding Period, Average Trade Return,
-Turnover, Market Exposure, and Daily Hit Ratio.
+Comprehensive Quantitative Performance & Risk Metrics Library for QUANTLAB v1.1.
+Implements mathematically authoritative calculations for portfolio and trade-level KPIs:
+- Net Profit & Total Return (%)
+- CAGR (%) with elapsed calendar days annualization
+- Win Rate, Gross Profit, Gross Loss, Profit Factor
+- Average Trade, Average Win, Average Loss, Expectancy (EV)
+- Mark-to-Market Daily Returns, Annualized Volatility (%)
+- Sharpe Ratio (Rf = 0 baseline)
+- Sortino Ratio (downside deviation over all daily observations)
+- Max Drawdown (INR & %) and Calmar Ratio
+- Max Win/Loss streaks and skewness
+- Robust handling for zero-trade, zero-volatility, and zero-loss edge cases.
 """
 
-import os
-import sys
 from typing import Dict, List, Any, Optional
+import math
 import numpy as np
 import pandas as pd
-
-# Ensure local imports work
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 
 def calculate_metrics(
     portfolio_df: pd.DataFrame,
     trade_log_df: pd.DataFrame,
-    initial_capital: float = 100000.0,
+    initial_capital: float = 10000000.0,
+    risk_free_rate: float = 0.0,
+    annualization_days: int = 252,
     price_df: Optional[pd.DataFrame] = None
 ) -> Dict[str, Any]:
     """
@@ -29,173 +35,245 @@ def calculate_metrics(
     Parameters
     ----------
     portfolio_df : pd.DataFrame
-        Daily portfolio tracking data containing "Portfolio Value" and "Portfolio Return".
+        Daily portfolio tracking data containing "Portfolio Value" and optional "Portfolio Return".
     trade_log_df : pd.DataFrame
-        Log of executed trades.
+        Log of executed trades and orders.
     initial_capital : float
-        Starting cash balance in INR.
+        Starting cash balance in INR (default: ₹10,000,000).
+    risk_free_rate : float
+        Annualized risk-free rate (default: 0.0).
+    annualization_days : int
+        Number of trading days per year (default: 252).
     price_df : pd.DataFrame, optional
         Stock price dataframe.
 
     Returns
     -------
     Dict[str, Any]
-        Calculated metric dictionary.
+        Calculated metric dictionary adhering to QUANTLAB v1.1 specifications.
     """
-    final_value = portfolio_df["Portfolio Value"].iloc[-1]
-    
-    # 1. Total Return
-    total_return = (final_value - initial_capital) / initial_capital
-
-    # 2. CAGR (Compound Annual Growth Rate)
-    start_date = portfolio_df.index.min()
-    end_date = portfolio_df.index.max()
-    calendar_days = (end_date - start_date).days
-    years = calendar_days / 365.25 if calendar_days > 0 else 0.0
-    cagr = ((final_value / initial_capital) ** (1.0 / years) - 1.0) if years > 0 else 0.0
-
-    # 3. Annual Volatility
-    daily_returns = portfolio_df["Portfolio Return"]
-    daily_vol = daily_returns.std()
-    annual_vol = daily_vol * np.sqrt(252) if not pd.isna(daily_vol) and daily_vol > 0 else 0.0
-
-    # 4. Sharpe Ratio (Rf = 0)
-    mean_daily_return = daily_returns.mean()
-    sharpe_ratio = (mean_daily_return / daily_vol) * np.sqrt(252) if annual_vol > 0 else 0.0
-
-    # 5. Sortino Ratio (Downside volatility, Rf = 0)
-    negative_returns = daily_returns[daily_returns < 0]
-    if len(negative_returns) > 0 and negative_returns.std() > 0:
-        downside_std = negative_returns.std()
-        sortino_ratio = (mean_daily_return / downside_std) * np.sqrt(252)
+    # --------------------------------------------------------------------------
+    # 1. Equity & Returns Calculations
+    # --------------------------------------------------------------------------
+    if portfolio_df is not None and not portfolio_df.empty and "Portfolio Value" in portfolio_df.columns:
+        equity_series = portfolio_df["Portfolio Value"].dropna()
+        final_equity = float(equity_series.iloc[-1])
+        start_date = portfolio_df.index.min()
+        end_date = portfolio_df.index.max()
+        calendar_days = max(1, (end_date - start_date).days)
+        years = calendar_days / 365.25
     else:
-        sortino_ratio = 0.0
+        equity_series = pd.Series([initial_capital])
+        final_equity = initial_capital
+        calendar_days = 0
+        years = 0.0
 
-    # 6. Maximum Drawdown
-    portfolio_values = portfolio_df["Portfolio Value"]
-    running_max = portfolio_values.cummax()
-    drawdowns = (portfolio_values - running_max) / running_max
-    max_drawdown = drawdowns.min() if not pd.isna(drawdowns.min()) else 0.0
+    net_profit = final_equity - initial_capital
+    total_return_pct = 100.0 * (final_equity / initial_capital - 1.0) if initial_capital > 0 else 0.0
 
-    # 7. Calmar Ratio
-    calmar_ratio = (cagr / abs(max_drawdown)) if (max_drawdown < 0 and cagr > 0) else 0.0
+    # CAGR %
+    if years > 0 and final_equity > 0 and initial_capital > 0:
+        cagr_pct = 100.0 * ((final_equity / initial_capital) ** (365.25 / calendar_days) - 1.0)
+    else:
+        cagr_pct = 0.0
 
-    # 8. Trade-level Analysis
-    trade_returns: List[float] = []
+    # Daily MTM Returns & Volatility
+    if len(equity_series) > 1:
+        daily_returns = equity_series.pct_change().dropna()
+    else:
+        daily_returns = pd.Series(dtype=float)
+
+    n_daily_obs = len(daily_returns)
+    daily_rf = (1.0 + risk_free_rate) ** (1.0 / annualization_days) - 1.0 if risk_free_rate > 0 else 0.0
+
+    if n_daily_obs > 1:
+        daily_vol = float(daily_returns.std(ddof=1))
+        annualized_vol_pct = 100.0 * daily_vol * math.sqrt(annualization_days) if daily_vol > 0 else 0.0
+    else:
+        daily_vol = 0.0
+        annualized_vol_pct = 0.0
+
+    # Sharpe Ratio
+    if daily_vol > 1e-9:
+        excess_returns = daily_returns - daily_rf
+        mean_excess = float(excess_returns.mean())
+        sharpe_ratio = float(math.sqrt(annualization_days) * mean_excess / daily_vol)
+    else:
+        sharpe_ratio = None if n_daily_obs <= 1 else 0.0
+
+    # Downside Deviation & Sortino Ratio
+    # Definition: sqrt(mean(min(r_d - r_f, 0)^2)) using all observations in denominator
+    if n_daily_obs > 0:
+        excess_returns = daily_returns - daily_rf
+        downside_diffs = np.minimum(excess_returns, 0.0)
+        downside_variance = np.mean(downside_diffs ** 2)
+        downside_dev = math.sqrt(float(downside_variance))
+        if downside_dev > 1e-9:
+            sortino_ratio = float(math.sqrt(annualization_days) * float(excess_returns.mean()) / downside_dev)
+        else:
+            sortino_ratio = float("inf") if excess_returns.mean() > 0 else None
+    else:
+        downside_dev = 0.0
+        sortino_ratio = None
+
+    # Maximum Drawdown
+    if len(equity_series) > 0:
+        running_peak = equity_series.cummax()
+        drawdown_amounts = running_peak - equity_series
+        drawdown_pcts = 100.0 * (drawdown_amounts / running_peak)
+        max_drawdown_amount = float(drawdown_amounts.max()) if not drawdown_amounts.empty else 0.0
+        max_drawdown_pct = float(drawdown_pcts.max()) if not drawdown_pcts.empty else 0.0
+    else:
+        max_drawdown_amount = 0.0
+        max_drawdown_pct = 0.0
+
+    # Calmar Ratio: CAGR % / Max Drawdown %
+    if max_drawdown_pct > 1e-6:
+        calmar_ratio = float(cagr_pct / max_drawdown_pct)
+    else:
+        calmar_ratio = float("inf") if cagr_pct > 0 else None
+
+    # --------------------------------------------------------------------------
+    # 2. Closed-Trade Level Performance
+    # --------------------------------------------------------------------------
+    closed_pnls: List[float] = []
+    closed_pnl_pcts: List[float] = []
     holding_periods: List[int] = []
-    gross_profit = 0.0
-    gross_loss = 0.0
 
-    if not trade_log_df.empty:
-        # Filter buys and sells
-        type_col = "BUY/SELL" if "BUY/SELL" in trade_log_df.columns else "Type"
-        type_str = trade_log_df[type_col].astype(str).str.upper()
-        buys = trade_log_df[type_str.str.contains("BUY")]
-        sells = trade_log_df[type_str.str.contains("SELL")]
-        n_trades = min(len(buys), len(sells))
-        
-        for idx in range(n_trades):
-            buy_row = buys.iloc[idx]
-            sell_row = sells.iloc[idx]
-            
-            buy_date = buy_row.name if isinstance(buy_row.name, pd.Timestamp) else pd.to_datetime(str(buy_row.name))
-            sell_date = sell_row.name if isinstance(sell_row.name, pd.Timestamp) else pd.to_datetime(str(sell_row.name))
-            
-            days_held = (sell_date - buy_date).days
-            holding_periods.append(max(days_held, 1))
+    if trade_log_df is not None and not trade_log_df.empty:
+        # Check if Realized PnL is already recorded row-by-row
+        if "Realized PnL" in trade_log_df.columns:
+            sell_rows = trade_log_df[trade_log_df["Realized PnL"] != 0.0]
+            if not sell_rows.empty:
+                closed_pnls = sell_rows["Realized PnL"].astype(float).tolist()
 
-            buy_val = buy_row["Shares"] * buy_row["Execution Price"]
-            buy_fee = buy_row.get("Commission", buy_row.get("Transaction Cost", 0.0))
-            total_buy_cost = buy_val + buy_fee
+        # If not populated via Realized PnL column, match sequential BUYs and SELLs
+        if not closed_pnls:
+            type_col = "BUY/SELL" if "BUY/SELL" in trade_log_df.columns else "Type"
+            if type_col in trade_log_df.columns:
+                type_str = trade_log_df[type_col].astype(str).str.upper()
+                buys = trade_log_df[type_str.str.contains("BUY")]
+                sells = trade_log_df[type_str.str.contains("SELL")]
+                n_pairs = min(len(buys), len(sells))
 
-            sell_val = sell_row["Shares"] * sell_row["Execution Price"]
-            sell_fee = sell_row.get("Commission", sell_row.get("Transaction Cost", 0.0))
-            net_sell_proceeds = sell_val - sell_fee
+                for idx in range(n_pairs):
+                    b_row = buys.iloc[idx]
+                    s_row = sells.iloc[idx]
 
-            pnl = net_sell_proceeds - total_buy_cost
-            if pnl > 0:
-                gross_profit += pnl
-            else:
-                gross_loss += abs(pnl)
+                    b_qty = float(b_row.get("Shares", b_row.get("Quantity", 1)))
+                    s_qty = float(s_row.get("Shares", s_row.get("Quantity", 1)))
+                    qty = min(b_qty, s_qty)
 
-            trade_ret = (pnl / total_buy_cost) if total_buy_cost > 0 else 0.0
-            trade_returns.append(trade_ret)
-    else:
-        n_trades = 0
+                    b_px = float(b_row.get("Execution Price", b_row.get("Executed Price", b_row.get("Price", 0.0))))
+                    s_px = float(s_row.get("Execution Price", s_row.get("Executed Price", s_row.get("Price", 0.0))))
 
-    if trade_returns:
-        trade_returns_arr = np.array(trade_returns)
-        winning_trades = trade_returns_arr[trade_returns_arr > 0]
-        losing_trades = trade_returns_arr[trade_returns_arr <= 0]
-        
-        win_rate = len(winning_trades) / len(trade_returns_arr) if len(trade_returns_arr) > 0 else 0.0
-        avg_trade_return = trade_returns_arr.mean() if len(trade_returns_arr) > 0 else 0.0
-        avg_win = winning_trades.mean() if len(winning_trades) > 0 else 0.0
-        avg_loss = losing_trades.mean() if len(losing_trades) > 0 else 0.0
-    else:
-        win_rate = 0.0
-        avg_trade_return = 0.0
-        avg_win = 0.0
-        avg_loss = 0.0
+                    b_cost = float(b_row.get("Transaction Cost", b_row.get("Commission", 0.0)))
+                    s_cost = float(s_row.get("Transaction Cost", s_row.get("Commission", 0.0)))
 
-    # Profit Factor
+                    trade_pnl = (qty * s_px) - (qty * b_px) - b_cost - s_cost
+                    closed_pnls.append(trade_pnl)
+                    total_entry_val = qty * b_px + b_cost
+                    if total_entry_val > 0:
+                        closed_pnl_pcts.append(trade_pnl / total_entry_val)
+
+    total_closed_trades = len(closed_pnls)
+    winning_pnls = [p for p in closed_pnls if p > 0]
+    losing_pnls = [p for p in closed_pnls if p < 0]
+    even_pnls = [p for p in closed_pnls if p == 0]
+
+    winning_count = len(winning_pnls)
+    losing_count = len(losing_pnls)
+    even_count = len(even_pnls)
+
+    win_rate_pct = 100.0 * (winning_count / total_closed_trades) if total_closed_trades > 0 else 0.0
+    loss_rate_pct = 100.0 * (losing_count / total_closed_trades) if total_closed_trades > 0 else 0.0
+
+    gross_profit = float(sum(winning_pnls))
+    gross_loss = float(abs(sum(losing_pnls)))
+
     if gross_loss > 0:
-        profit_factor = gross_profit / gross_loss
+        profit_factor = float(gross_profit / gross_loss)
     elif gross_profit > 0:
         profit_factor = float("inf")
     else:
-        profit_factor = 0.0
+        profit_factor = None if total_closed_trades == 0 else 0.0
 
-    # Average Holding Period
-    avg_holding_period = np.mean(holding_periods) if holding_periods else 0.0
+    avg_trade_pnl = float(sum(closed_pnls) / total_closed_trades) if total_closed_trades > 0 else 0.0
+    avg_win_pnl = float(gross_profit / winning_count) if winning_count > 0 else 0.0
+    avg_loss_pnl = float(gross_loss / losing_count) if losing_count > 0 else 0.0
 
-    # 9. Turnover Rate
-    trade_vol_col = "Value" if "Value" in trade_log_df.columns else None
-    total_trade_volume = trade_log_df[trade_vol_col].sum() if (not trade_log_df.empty and trade_vol_col) else 0.0
-    avg_portfolio_val = portfolio_values.mean() if len(portfolio_values) > 0 else initial_capital
-    turnover = (total_trade_volume / (2.0 * avg_portfolio_val)) / years if (years > 0 and avg_portfolio_val > 0) else 0.0
+    # Expectancy (EV) = Win_prob * Average_win - Loss_prob * Average_loss
+    win_prob = winning_count / total_closed_trades if total_closed_trades > 0 else 0.0
+    loss_prob = losing_count / total_closed_trades if total_closed_trades > 0 else 0.0
+    expectancy_ev = (win_prob * avg_win_pnl) - (loss_prob * avg_loss_pnl) if total_closed_trades > 0 else 0.0
 
-    # 10. Exposure & Hit Ratio
-    exposure = (portfolio_df["Shares"] > 0).mean() if "Shares" in portfolio_df.columns else 0.0
-    hit_ratio = (daily_returns > 0).sum() / len(daily_returns) if len(daily_returns) > 0 else 0.0
+    # Streaks & Skewness
+    max_win_streak = 0
+    max_loss_streak = 0
+    curr_win = 0
+    curr_loss = 0
+    for p in closed_pnls:
+        if p > 0:
+            curr_win += 1
+            curr_loss = 0
+            if curr_win > max_win_streak:
+                max_win_streak = curr_win
+        elif p < 0:
+            curr_loss += 1
+            curr_win = 0
+            if curr_loss > max_loss_streak:
+                max_loss_streak = curr_loss
+        else:
+            curr_win = 0
+            curr_loss = 0
 
+    if len(closed_pnls) >= 3 and np.std(closed_pnls) > 0:
+        pnl_series = pd.Series(closed_pnls)
+        skewness_val = float(pnl_series.skew())
+    else:
+        skewness_val = 0.0
+
+    # Format output dictionary with both descriptive and numerical representations
     return {
-        "Total Return": total_return,
-        "CAGR": cagr,
-        "Annual Volatility": annual_vol,
-        "Sharpe Ratio": sharpe_ratio,
-        "Sortino Ratio": sortino_ratio,
-        "Calmar Ratio": calmar_ratio,
-        "Maximum Drawdown": max_drawdown,
-        "Win Rate": win_rate,
-        "Profit Factor": profit_factor,
-        "Average Holding Period": avg_holding_period,
-        "Average Trade Return": avg_trade_return,
-        "Number of Trades": n_trades,
-        "Turnover": turnover,
-        "Exposure": exposure,
-        "Hit Ratio": hit_ratio,
-        "Average Win": avg_win,
-        "Average Loss": avg_loss,
+        # Portfolio Equity & Returns
+        "Initial Capital": initial_capital,
+        "Final Equity": final_equity,
+        "Net Profit": net_profit,
+        "Total Return": total_return_pct / 100.0,
+        "Total Return %": total_return_pct,
+        "CAGR": cagr_pct / 100.0,
+        "CAGR %": cagr_pct,
+        "Calendar Days": calendar_days,
+        "Years": years,
+
+        # Risk-Adjusted Ratios
+        "Sharpe Ratio": sharpe_ratio if sharpe_ratio is not None else 0.0,
+        "Sortino Ratio": sortino_ratio if sortino_ratio is not None else 0.0,
+        "Annualized Volatility %": annualized_vol_pct,
+        "Downside Deviation": downside_dev,
+        "Maximum Drawdown": -max_drawdown_pct / 100.0,
+        "Maximum Drawdown %": -max_drawdown_pct,
+        "Maximum Drawdown INR": -max_drawdown_amount,
+        "Calmar Ratio": calmar_ratio if calmar_ratio is not None else 0.0,
+
+        # Trade-Level Statistics
+        "Total Closed Trades": total_closed_trades,
+        "Winning Trades": winning_count,
+        "Losing Trades": losing_count,
+        "Even Trades": even_count,
+        "Win Rate": win_rate_pct / 100.0,
+        "Win Rate %": win_rate_pct,
+        "Loss Rate %": loss_rate_pct,
+        "Gross Profit": gross_profit,
+        "Gross Loss": gross_loss,
+        "Profit Factor": profit_factor if profit_factor is not None else 0.0,
+        "Average Trade PnL": avg_trade_pnl,
+        "Average Win": avg_win_pnl,
+        "Average Loss": avg_loss_pnl,
+        "Expectancy (EV)": expectancy_ev,
+        "Max Win Streak": max_win_streak,
+        "Max Loss Streak": max_loss_streak,
+        "Skewness": skewness_val,
+        "Exposure": float(portfolio_df["Exposure"].mean()) if (portfolio_df is not None and "Exposure" in portfolio_df.columns) else 0.0,
+        "Turnover": 0.0
     }
-
-
-if __name__ == "__main__":
-    print("Testing metrics.py for Phase 3...")
-    try:
-        from strategy import generate_signals
-        from backtester import run_backtest
-
-        sample_path = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "RELIANCE.csv")
-        if os.path.exists(sample_path):
-            df_sample = pd.read_csv(sample_path, index_col="Date")
-            df_sample.index = pd.to_datetime(df_sample.index)
-            
-            df_sig = generate_signals(df_sample, strategy_name="SMA")
-            port_df, trade_df = run_backtest(df_sig)
-            metrics = calculate_metrics(port_df, trade_df)
-            print("Calculated Metrics Test:")
-            for k, v in metrics.items():
-                print(f"  {k}: {v}")
-    except Exception as e:
-        print(f"Self-test error: {e}")

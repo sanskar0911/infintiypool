@@ -8,42 +8,42 @@ Strategy Name         : SMA Crossover Strategy
 Stock Ticker / Universe: RELIANCE
 Hypothesis            : Quantitative momentum / trend following strategy
 Date Range            : 2020-01-01 to 2024-12-31
-Initial Capital        : INR 100,000.00
-Final Portfolio Value  : INR 102,451.81
+Initial Capital        : INR 10,000,000.00
+Final Portfolio Value  : INR 10,132,204.05
 
 2. EXECUTION & PORTFOLIO RULES
 --------------------------------------------------------------------------------
-Position Allocation   : 20% max per trade
+Position Allocation   : 5% max per trade
 Maximum Position Cap  : 10 simultaneous positions
 Rebalancing Frequency : Daily
-Transaction Cost Rate : 0.10% (0.1% per trade)
+Transaction Cost Rate : 0.03% (0.1% per trade)
 Execution Slippage    : 0.05% (0.05% per trade)
-Stop Loss / Take Profit: SL 5.0% | TP 10.0%
+Stop Loss / Take Profit: SL None% | TP None%
 
 3. PERFORMANCE & RETURN METRICS
 --------------------------------------------------------------------------------
-Total Return          : 2.45%
-CAGR (Compound Ann)   : 0.49%
-Annualized Volatility : 2.52%
-Sharpe Ratio (Rf=0)   : 0.2080
-Sortino Ratio (Rf=0)  : 0.1585
-Maximum Drawdown (MDD): -5.57%
+Total Return          : 1.32%
+CAGR (Compound Ann)   : 0.26%
+Annualized Volatility : 0.00%
+Sharpe Ratio (Rf=0)   : 0.2652
+Sortino Ratio (Rf=0)  : 0.4007
+Maximum Drawdown (MDD): -3.12%
 
 4. TRADING & EXPOSURE STATISTICS
 --------------------------------------------------------------------------------
-Total Executed Trades : 16
+Total Executed Trades : 0
 Trade Win Rate        : 31.25%
-Annual Portfolio Turnover: 63.60%
-Market Time Exposure  : 23.99%
+Annual Portfolio Turnover: 0.00%
+Market Time Exposure  : 2.74%
 
 5. BENCHMARK COMPARISON (NIFTY50)
 --------------------------------------------------------------------------------
-Strategy CAGR vs Benchmark: 0.49% vs 16.10%
-Excess Annual Return   : -15.61%
-Strategy Sharpe vs Bench  : 0.21 vs 0.84
-Portfolio Beta        : 0.03
-Correlation with Bench: 0.21
-Information Ratio     : -0.77
+Strategy CAGR vs Benchmark: 0.26% vs 16.10%
+Excess Annual Return   : -15.84%
+Strategy Sharpe vs Bench  : 0.27 vs 0.84
+Portfolio Beta        : 0.02
+Correlation with Bench: 0.31
+Information Ratio     : -0.78
 
 6. OUT-OF-SAMPLE VALIDATION & ROBUSTNESS
 --------------------------------------------------------------------------------

@@ -1,0 +1,64 @@
+# ==============================================================================
+# QUANTLAB Unified Quantitative Backtesting Engine v1.1
+# Centralized Baseline Configuration Specification
+# ==============================================================================
+
+version: "1.1"
+engine_name: "QUANTLAB Unified Backtesting Engine"
+market: "Indian Cash Equities"
+currency: "INR"
+
+portfolio:
+  initial_capital: 10000000.0          # INR 10,000,000 (₹1 Crore)
+  account_currency: "INR"
+  trading_direction: "long_only"       # Long-only trading
+  allow_short_selling: false           # Short selling disabled
+  leverage: 1.0                        # Max 1.0x equity (no borrowing/leverage)
+  minimum_cash_reserve: 0.0            # Minimum cash buffer
+  fractional_shares: false             # Fractional shares disabled; integer quantities only
+  terminal_policy: "force_close"       # Force-close open positions at final available price
+  terminal_exit_reason: "Terminal Liquidation"
+
+position_sizing:
+  method: "fixed_fraction"             # Fixed fraction of current portfolio equity
+  target_allocation_fraction: 0.05     # 5.0% of current equity per new position
+  sizing_basis: "equity"               # "equity" (baseline) or "cash" (compatibility mode)
+  insufficient_cash_policy: "REJECT"   # REJECT if cash insufficient for 1 whole share
+
+execution:
+  timing: "NEXT_BAR_OPEN"              # Completed-bar signal executed at first available quote
+  intrabar_mode: false                 # Mode A (completed bar) vs Mode B (intrabar/tick)
+  slippage_model: "percentage"         # Adverse percentage slippage
+  slippage_rate: 0.0005                # 0.05% adverse slippage per side (s = 0.0005)
+  spread_aware: true                   # Use Ask for Buy, Bid for Sell if quotes available
+
+transaction_costs:
+  enabled: true
+  brokerage_rate: 0.0003               # 0.03% baseline per side
+  stt_rate_buy: 0.0                    # Buy-side STT: 0%
+  stt_rate_sell: 0.0010                # Sell-side STT: 0.10% on gross sell transaction value
+  stamp_duty_rate_buy: 0.00015         # Buy-side Stamp Duty: 0.015% on gross buy value
+  stamp_duty_rate_sell: 0.0            # Sell-side Stamp Duty: 0%
+  gst_rate: 0.18                       # GST: 18% of (Brokerage + Exchange Charges)
+  exchange_charge_rate: 0.0            # Exchange transaction charges: 0% baseline (configurable)
+  sebi_charge_rate: 0.0                # SEBI turnover charges: 0% baseline (configurable)
+  dp_charges_per_sell: 0.0             # Depository Participant charges per sell: ₹0 baseline
+
+order_sequencing:
+  sell_first: true                     # Process SELL signals before BUY candidates
+  buy_sort_order: "alphabetical"       # Alphabetical symbol order for BUY candidates
+  duplicate_prevention: true           # Suppress BUY if symbol is already held
+  same_bar_conflict_rule: "prioritize_sell"  # Prioritize exit; suppress same-event re-entry
+
+performance_metrics:
+  annualization_days: 252              # 252 trading days per year
+  risk_free_rate: 0.0                  # 0.0% baseline for Sharpe and Sortino calculations
+  downside_deviation_denominator: "all" # Denominator includes all observations N
+
+audit_and_reproducibility:
+  seed: 42
+  deterministic_ordering: true
+  log_level: "INFO"
+  export_ledger: true
+  export_equity_curve: true
+  export_metrics: true
