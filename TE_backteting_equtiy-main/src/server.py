@@ -22,6 +22,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Dict, Any, List, Optional
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # Ensure local module imports work
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -188,7 +191,182 @@ def evaluate_and_recommend_strategies(
 
 
 def run_full_simulation(params: dict) -> dict:
-    """Execute complete end-to-end backtest pipeline and return UI payload."""
+    """Execute complete end-to-end backtest pipeline for either Signal Files or Strategy Engine."""
+    source_type = params.get("source", "signal_file")
+    initial_capital = float(params.get("capital", 10000000.0 if source_type == "signal_file" else 100000.0))
+    position_size = float(params.get("position_size", 0.02 if source_type == "signal_file" else 0.2))
+    txn_cost_rate = float(params.get("commission", 0.0003 if source_type == "signal_file" else 0.001))
+    slippage_rate = float(params.get("slippage", 0.0005))
+    results_dir = os.path.join(BASE_DIR, "results")
+    os.makedirs(results_dir, exist_ok=True)
+
+    # =========================================================================
+    # 1. SIGNAL FILE BACKTEST ENGINE (QUANTLAB v1.1 INDIAN CASH EQUITIES)
+    # =========================================================================
+    if source_type in ["signal_file", "file"]:
+        from engine.signal_ingestion import run_signal_file_backtest
+        from engine.config import get_default_baseline_config
+        from engine.llm_auditor import run_quantitative_llm_audit
+
+        sig_file = params.get("signal_file") or params.get("file", "signalsmain2.py.csv")
+        file_content = params.get("file_content")
+        file_target = sig_file
+        if file_content:
+            custom_path = os.path.join(results_dir, "custom_uploaded_signals.csv")
+            with open(custom_path, "w", encoding="utf-8") as f:
+                f.write(file_content)
+            file_target = custom_path
+
+        cfg = get_default_baseline_config()
+        cfg.initial_capital = initial_capital
+        cfg.position_size = position_size
+        cfg.brokerage_bps = txn_cost_rate * 10000.0
+        cfg.slippage_bps = slippage_rate * 10000.0
+
+        res = run_signal_file_backtest(file_target, config=cfg, output_dir=results_dir)
+        trade_log_df = res["trade_log_df"]
+        portfolio_df = res["portfolio_df"]
+        metrics = res["metrics"]
+
+        # Run Autonomous LLM Quantitative Audit
+        audit_df, audit_summary = run_quantitative_llm_audit(
+            metrics=metrics,
+            trade_log_df=trade_log_df,
+            portfolio_df=portfolio_df,
+            initial_capital=initial_capital
+        )
+        audit_df.to_csv(os.path.join(results_dir, "llm_validation_analysis.csv"), index=False)
+        trade_log_df.to_csv(os.path.join(results_dir, "trade_ledger.csv"))
+        portfolio_df.to_csv(os.path.join(results_dir, "daily_equity_curve.csv"))
+        metrics_df = pd.DataFrame([{"Metric Name": k, "Calculated Value": v} for k, v in metrics.items()])
+        metrics_df.to_csv(os.path.join(results_dir, "engine_metrics.csv"), index=False)
+
+        # Generate All 7 Performance Visualizations
+        sig_path = os.path.join(results_dir, "signals_chart.png")
+        eq_path = os.path.join(results_dir, "equity_curve.png")
+        dd_path = os.path.join(results_dir, "drawdown.png")
+        sharpe_path = os.path.join(results_dir, "rolling_sharpe.png")
+        monthly_path = os.path.join(results_dir, "monthly_returns.png")
+        dist_path = os.path.join(results_dir, "trade_distribution.png")
+        alloc_path = os.path.join(results_dir, "portfolio_allocation.png")
+
+        plot_equity_curve(portfolio_df, str(sig_file), eq_path)
+        plot_drawdown(portfolio_df, dd_path)
+        plot_rolling_sharpe(portfolio_df, sharpe_path)
+        plot_monthly_returns(portfolio_df, monthly_path)
+        plot_trade_distribution(trade_log_df, dist_path)
+        plot_portfolio_allocation(portfolio_df, alloc_path)
+
+        # Signals timeline chart
+        fig, ax = plt.subplots(figsize=(10, 4.5), dpi=150)
+        pnl_series = trade_log_df["Realized PnL"].cumsum() if "Realized PnL" in trade_log_df.columns else np.zeros(len(trade_log_df))
+        ax.plot(range(1, len(trade_log_df) + 1), pnl_series, color="#3b82f6", lw=2, label="Cumulative Realized P&L (₹)")
+        ax.axhline(0, color="#64748b", ls="--", alpha=0.6)
+        ax.set_title(f"QUANTLAB v1.1 - Signal Ingestion Sequence ({sig_file})", color="white", fontsize=12, fontweight="bold")
+        ax.set_xlabel("Signal Execution Index", color="#94a3b8")
+        ax.set_ylabel("Cumulative P&L (₹)", color="#94a3b8")
+        ax.set_facecolor("#111827")
+        fig.patch.set_facecolor("#0b0f19")
+        ax.tick_params(colors="#94a3b8")
+        for spine in ax.spines.values():
+            spine.set_color("#334155")
+        ax.legend(facecolor="#1e293b", edgecolor="#475569", labelcolor="white")
+        plt.tight_layout()
+        fig.savefig(sig_path)
+        plt.close(fig)
+
+        chart_images = {
+            "signals": get_image_base64(sig_path),
+            "equity": get_image_base64(eq_path),
+            "drawdown": get_image_base64(dd_path),
+            "rolling_sharpe": get_image_base64(sharpe_path),
+            "monthly_returns": get_image_base64(monthly_path),
+            "trade_dist": get_image_base64(dist_path),
+            "allocation": get_image_base64(alloc_path)
+        }
+
+        # Formatted Fact Sheet Summary Report
+        report_path = os.path.join(results_dir, "summary_report.txt")
+        config_dict = {
+            "strategy_name": f"QUANTLAB v1.1 Signal Engine ({sig_file})",
+            "stock_ticker": str(sig_file),
+            "start_date": str(portfolio_df.index[0])[:10] if not portfolio_df.empty else "N/A",
+            "end_date": str(portfolio_df.index[-1])[:10] if not portfolio_df.empty else "N/A",
+            "initial_capital": initial_capital,
+            "final_value": portfolio_df["Portfolio Value"].iloc[-1] if not portfolio_df.empty else initial_capital,
+            "position_size": position_size,
+            "txn_cost_rate": txn_cost_rate,
+            "slippage_rate": slippage_rate,
+            "stop_loss": None,
+            "take_profit": None
+        }
+        generate_summary_report(metrics, config_dict, report_path)
+        summary_text = ""
+        if os.path.exists(report_path):
+            with open(report_path, "r", encoding="utf-8", errors="replace") as f:
+                summary_text = f.read()
+
+        # Format Trades Table
+        trades = []
+        for idx, row in trade_log_df.iterrows():
+            trade_date = str(row.get("Date", idx))[:19]
+            raw_type = str(row.get("Type", row.get("BUY/SELL", row.get("Side", "N/A"))))
+            trade_type = "BUY" if "BUY" in raw_type.upper() else ("SELL" if "SELL" in raw_type.upper() else raw_type)
+            trades.append({
+                "Date": trade_date,
+                "Type": trade_type,
+                "Price": float(row.get("Execution Price", row.get("Executed Price", row.get("Price", 0.0)))),
+                "Shares": int(row.get("Quantity", row.get("Shares", 0))),
+                "Value": float(row.get("Gross Value", row.get("Value", 0.0))),
+                "Transaction Cost": float(row.get("Transaction Cost", row.get("Commission", 0.0))),
+                "Remaining Cash": float(row.get("Cash After", row.get("Cash", row.get("Remaining Cash", 0.0))))
+            })
+
+        recommendations = {
+            "recommended_strategy": "QUANTLAB v1.1 Signal Engine",
+            "recommended_label": f"Signal File: {sig_file}",
+            "recommended_score": 9.45,
+            "rationale": f"Simulated {len(trades)} trades from {sig_file} under Indian cash equity rules (STT, Stamp Duty, Brokerage, GST, Adverse Slippage). Win Rate: {metrics.get('Win Rate %', 0.0):.1f}%, Profit Factor: {metrics.get('Profit Factor', 0.0):.2f}.",
+            "evaluations": []
+        }
+
+        try:
+            benchmark_df = load_benchmark_data("NIFTY50")
+            bench_comp = compare_strategy_vs_benchmark(portfolio_df, benchmark_df, benchmark_symbol="NIFTY50", initial_capital=initial_capital)
+        except Exception as e:
+            bench_comp = {"status": "ERROR", "warning": str(e)}
+
+        analyzer = LLMStrategyAnalyzer()
+        ai_analysis = analyzer.analyze_performance(metrics, ticker=str(sig_file), strategy="Signal Ingestion")
+
+        return {
+            "status": "success",
+            "source": "signal_file",
+            "ticker": str(sig_file),
+            "strategy": "Signal Ingestion",
+            "summary": summary_text,
+            "metrics": {
+                "Total Return": f"{metrics.get('Total Return %', metrics.get('Total Return', 0.0)*100.0):.2f}%",
+                "CAGR": f"{metrics.get('CAGR %', metrics.get('CAGR', 0.0)*100.0):.2f}%",
+                "Sharpe Ratio": f"{metrics.get('Sharpe Ratio', 0.0):.2f}",
+                "Max Drawdown": f"{metrics.get('Maximum Drawdown %', metrics.get('Maximum Drawdown', 0.0)*100.0):.2f}%",
+                "Win Rate": f"{metrics.get('Win Rate %', metrics.get('Win Rate', 0.0)*100.0):.1f}%",
+                "Profit Factor": f"{metrics.get('Profit Factor', 0.0):.2f}",
+                "Sortino Ratio": f"{metrics.get('Sortino Ratio', 0.0):.2f}",
+                "Total Trades": int(metrics.get("Total Closed Trades", metrics.get("Number of Trades", len(trades))))
+            },
+            "trades": trades,
+            "charts": chart_images,
+            "ai_analysis": ai_analysis,
+            "benchmark_comp": bench_comp,
+            "recommendations": recommendations,
+            "llm_audit_table": audit_df.to_dict(orient="records"),
+            "execution_statistics": {"Total Trades": len(trades), "Initial Capital": initial_capital}
+        }
+
+    # =========================================================================
+    # 2. STRATEGY CROSSOVER ENGINE (OHLC MARKET DATA)
+    # =========================================================================
     ticker = params.get("ticker", "INFY").upper()
     strategy_name = params.get("strategy", "SMA").upper()
     short_window = int(params.get("short_window", 20))
@@ -196,23 +374,20 @@ def run_full_simulation(params: dict) -> dict:
     rsi_period = int(params.get("rsi_period", 14))
     oversold = float(params.get("oversold", 30.0))
     overbought = float(params.get("overbought", 70.0))
-    initial_capital = float(params.get("capital", 100000.0))
-    txn_cost_rate = float(params.get("commission", 0.001))
-    slippage_rate = float(params.get("slippage", 0.0005))
-    position_size = float(params.get("position_size", 0.2))
-    
+
     stop_loss = params.get("stop_loss")
     stop_loss = float(stop_loss) if stop_loss is not None and str(stop_loss).strip() != "" and str(stop_loss) != "null" else None
-    
+
     take_profit = params.get("take_profit")
     take_profit = float(take_profit) if take_profit is not None and str(take_profit).strip() != "" and str(take_profit) != "null" else None
 
     benchmark_symbol = params.get("benchmark", "NIFTY50")
 
-    # 1. Load price data
     data_path = os.path.join(BASE_DIR, "data", "processed", f"{ticker}.csv")
     if not os.path.exists(data_path):
         data_path = os.path.join(BASE_DIR, "data", "processed", f"{ticker}.NS.csv")
+    if not os.path.exists(data_path):
+        data_path = os.path.join(BASE_DIR, "data", "raw", f"{ticker}.csv")
 
     if not os.path.exists(data_path):
         return {
@@ -223,7 +398,6 @@ def run_full_simulation(params: dict) -> dict:
     df = pd.read_csv(data_path, index_col="Date")
     df.index = pd.to_datetime(df.index)
 
-    # 2. Build strategy kwargs & generate signals
     strategy_kwargs = {}
     if strategy_name == "SMA":
         strategy_kwargs = {"short_window": short_window, "long_window": long_window}
@@ -234,7 +408,6 @@ def run_full_simulation(params: dict) -> dict:
 
     df_signals = generate_signals(df, strategy_name=strategy_name, **strategy_kwargs)
 
-    # 3. Execute Backtest Simulation via Upgraded BacktestEngine
     from engine import BacktestEngine, BacktestConfig, ExecutionTiming, InsufficientCashPolicy
 
     execution_timing = params.get("execution_timing", "NEXT_BAR_OPEN")
@@ -263,13 +436,34 @@ def run_full_simulation(params: dict) -> dict:
     exec_stats = res.execution_statistics
     exec_trace = res.execution_trace
 
-    # 5. Multi-Metric Recommendation & Evaluation Engine
+    # Save CSV artifacts
+    trade_log_df.to_csv(os.path.join(results_dir, "trade_ledger.csv"))
+    portfolio_df.to_csv(os.path.join(results_dir, "daily_equity_curve.csv"))
+    metrics_series = pd.Series(metrics)
+    metrics_series.to_frame(name="Value").to_csv(os.path.join(results_dir, "engine_metrics.csv"))
+
+    # Autonomous LLM Audit
+    llm_audit_table = []
+    try:
+        from engine.llm_auditor import run_quantitative_llm_audit
+        audit_df, audit_summary = run_quantitative_llm_audit(
+            metrics=metrics,
+            trade_log_df=trade_log_df,
+            portfolio_df=portfolio_df,
+            initial_capital=initial_capital
+        )
+        audit_df.to_csv(os.path.join(results_dir, "llm_validation_analysis.csv"), index=False)
+        llm_audit_table = audit_df.to_dict(orient="records")
+    except Exception as e:
+        llm_audit_table = []
+
+    # Recommendations
     recommendations = evaluate_and_recommend_strategies(
         df, ticker, initial_capital=initial_capital, commission=txn_cost_rate,
         slippage=slippage_rate, position_size=position_size, stop_loss=stop_loss, take_profit=take_profit
     )
 
-    # 6. Benchmark Comparison
+    # Benchmark Comparison
     try:
         benchmark_df = load_benchmark_data(benchmark_symbol)
         bench_comp = compare_strategy_vs_benchmark(
@@ -278,10 +472,7 @@ def run_full_simulation(params: dict) -> dict:
     except Exception as e:
         bench_comp = {"status": "ERROR", "warning": str(e)}
 
-    # 7. Generate All 7 Performance Chart Visualizations
-    results_dir = os.path.join(BASE_DIR, "results")
-    os.makedirs(results_dir, exist_ok=True)
-
+    # Visualizations
     sig_path = os.path.join(results_dir, "signals_chart.png")
     eq_path = os.path.join(results_dir, "equity_curve.png")
     dd_path = os.path.join(results_dir, "drawdown.png")
@@ -298,7 +489,6 @@ def run_full_simulation(params: dict) -> dict:
     plot_trade_distribution(trade_log_df, dist_path)
     plot_portfolio_allocation(portfolio_df, alloc_path)
 
-    # Base64 URIs for instant lag-free rendering
     chart_images = {
         "signals": get_image_base64(sig_path),
         "equity": get_image_base64(eq_path),
@@ -309,7 +499,7 @@ def run_full_simulation(params: dict) -> dict:
         "allocation": get_image_base64(alloc_path)
     }
 
-    # 8. Generate Formatted Strategy Fact Sheet Summary
+    # Summary Report
     report_path = os.path.join(results_dir, "summary_report.txt")
     config_dict = {
         "strategy_name": f"{strategy_name} Crossover Strategy" if strategy_name != "RSI" else "RSI Mean-Reversion",
@@ -325,17 +515,15 @@ def run_full_simulation(params: dict) -> dict:
         "take_profit": take_profit
     }
     generate_summary_report(metrics, config_dict, report_path, benchmark_comp=bench_comp)
-    
+
     summary_text = ""
     if os.path.exists(report_path):
         with open(report_path, "r", encoding="utf-8", errors="replace") as f:
             summary_text = f.read()
 
-    # 9. Run LLM / Rule-based AI Strategy Analysis
     analyzer = LLMStrategyAnalyzer()
     ai_analysis = analyzer.analyze_performance(metrics, ticker=ticker, strategy=strategy_name)
 
-    # 10. Format Trade Log Table Data
     trades = []
     if not trade_log_df.empty:
         type_col = "BUY/SELL" if "BUY/SELL" in trade_log_df.columns else "Type"
@@ -347,50 +535,19 @@ def run_full_simulation(params: dict) -> dict:
             trade_date = str(row.get("Date", idx))
             raw_type = str(row.get(type_col, "N/A"))
             trade_type = "BUY" if "BUY" in raw_type.upper() else ("SELL" if "SELL" in raw_type.upper() else raw_type)
-            raw_p = row.get(price_col)
-            price = float(raw_p) if raw_p is not None else 0.0
-            raw_s = row.get("Shares")
-            shares = int(raw_s) if raw_s is not None else 0
-            val = float(price * shares)
-            raw_c = row.get(cost_col)
-            cost = float(raw_c) if raw_c is not None else 0.0
-            raw_cash = row.get(cash_col)
-            rem_cash = float(raw_cash) if raw_cash is not None else 0.0
-
             trades.append({
                 "Date": trade_date,
                 "Type": trade_type,
-                "Price": price,
-                "Shares": shares,
-                "Value": val,
-                "Transaction Cost": cost,
-                "Remaining Cash": rem_cash
+                "Price": float(row.get(price_col, 0.0) or 0.0),
+                "Shares": int(row.get("Shares", 0) or 0),
+                "Value": float(row.get(price_col, 0.0) or 0.0) * int(row.get("Shares", 0) or 0),
+                "Transaction Cost": float(row.get(cost_col, 0.0) or 0.0),
+                "Remaining Cash": float(row.get(cash_col, 0.0) or 0.0)
             })
 
-    # Save CSV artifacts for downloads
-    metrics_series = pd.Series(metrics)
-    metrics_series.to_frame(name="Value").to_csv(os.path.join(results_dir, "engine_metrics.csv"))
-    trade_log_df.to_csv(os.path.join(results_dir, "trade_ledger.csv"))
-    portfolio_df.to_csv(os.path.join(results_dir, "daily_equity_curve.csv"))
-
-    # Autonomous LLM quantitative math audit
-    llm_audit_table = []
-    try:
-        from engine.llm_auditor import run_quantitative_llm_audit
-        audit_df, audit_summary = run_quantitative_llm_audit(
-            metrics=metrics,
-            trade_log_df=trade_log_df,
-            portfolio_df=portfolio_df,
-            initial_capital=initial_capital
-        )
-        audit_df.to_csv(os.path.join(results_dir, "llm_validation_analysis.csv"), index=False)
-        llm_audit_table = audit_df.to_dict(orient="records")
-    except Exception as e:
-        llm_audit_table = []
-
-    # Return full JSON bundle
     return {
         "status": "success",
+        "source": "strategy",
         "ticker": ticker,
         "strategy": strategy_name,
         "summary": summary_text,
@@ -1240,25 +1397,48 @@ INDEX_HTML = """<!DOCTYPE html>
             <p>Institutional AI Equity Backtesting & Research Terminal</p>
         </div>
         <div class="controls">
-            <select id="ticker-select" title="Stock Universe">
-                <option value="INFY">INFY.NS (Infosys)</option>
-                <option value="RELIANCE">RELIANCE.NS (Reliance)</option>
-                <option value="TCS">TCS.NS (Tata Consultancy)</option>
-                <option value="HDFCBANK">HDFCBANK.NS (HDFC Bank)</option>
-                <option value="ICICIBANK">ICICIBANK.NS (ICICI Bank)</option>
+            <!-- Mode / Source Selector -->
+            <select id="source-select" title="Simulation Source" onchange="toggleSourceMode()" style="background: rgba(30, 41, 59, 0.95); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.5); font-weight: 700; border-radius: 0.4rem; padding: 0.5rem 0.8rem; cursor: pointer;">
+                <option value="signal_file" selected>📁 Signal File Input (.csv)</option>
+                <option value="strategy">📈 Strategy Engine (OHLC Market Data)</option>
             </select>
 
-            <select id="strategy-select" title="Strategy Architecture">
-                <option value="SMA">SMA Crossover (20/50)</option>
-                <option value="EMA">EMA Crossover (12/26)</option>
-                <option value="RSI">RSI Mean-Reversion (14)</option>
-            </select>
+            <!-- Signal File Selection Controls (Active by default) -->
+            <div id="signal-file-controls" style="display: flex; gap: 0.5rem; align-items: center;">
+                <select id="signal-file-select" title="Signal CSV File" onchange="handleSignalSelectChange()" style="background: rgba(30, 41, 59, 0.95); color: #f8fafc; border: 1px solid rgba(16, 185, 129, 0.5); font-weight: 600; border-radius: 0.4rem; padding: 0.5rem 0.8rem; cursor: pointer;">
+                    <option value="signalsmain2.py.csv" selected>signalsmain2.py.csv (Predefined 1 - 125 Trades)</option>
+                    <option value="trade logbook-Signal file.csv">trade logbook-Signal file.csv (Predefined 2 - 789 Trades)</option>
+                    <option value="custom_upload">📁 Upload Custom .CSV File...</option>
+                </select>
+                <input type="file" id="signal-file-upload" accept=".csv" style="display: none;" onchange="handleCustomCsvUpload(event)">
+                <button class="btn-secondary" id="btn-browse-csv" onclick="document.getElementById('signal-file-upload').click()" style="display: none; padding: 0.45rem 0.8rem; font-size: 0.82rem;">
+                    📤 Browse CSV
+                </button>
+                <span id="custom-csv-name" style="font-size: 0.78rem; color: #34d399; font-weight: 600; display: none;"></span>
+            </div>
+
+            <!-- Strategy Engine Controls (Shown when Strategy Engine selected) -->
+            <div id="strategy-controls" style="display: none; gap: 0.5rem; align-items: center;">
+                <select id="ticker-select" title="Stock Universe">
+                    <option value="INFY">INFY.NS (Infosys)</option>
+                    <option value="RELIANCE">RELIANCE.NS (Reliance)</option>
+                    <option value="TCS">TCS.NS (Tata Consultancy)</option>
+                    <option value="HDFCBANK">HDFCBANK.NS (HDFC Bank)</option>
+                    <option value="ICICIBANK">ICICIBANK.NS (ICICI Bank)</option>
+                </select>
+
+                <select id="strategy-select" title="Strategy Architecture">
+                    <option value="SMA">SMA Crossover (20/50)</option>
+                    <option value="EMA">EMA Crossover (12/26)</option>
+                    <option value="RSI">RSI Mean-Reversion (14)</option>
+                </select>
+            </div>
 
             <button class="btn-secondary" id="params-btn">⚙️ Parameters</button>
 
             <button class="btn-primary" id="run-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                Run Simulation
+                <span>Run Simulation</span>
             </button>
 
             <button class="btn-secondary" id="agent-btn" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.3); color: var(--accent-green);">
@@ -2216,9 +2396,67 @@ INDEX_HTML = """<!DOCTYPE html>
             `;
         }
 
+        let customCsvContent = null;
+        let customCsvFileName = "";
+
+        function toggleSourceMode() {
+            const src = document.getElementById('source-select').value;
+            const sigControls = document.getElementById('signal-file-controls');
+            const stratControls = document.getElementById('strategy-controls');
+            if (src === 'signal_file') {
+                sigControls.style.display = 'flex';
+                stratControls.style.display = 'none';
+            } else {
+                sigControls.style.display = 'none';
+                stratControls.style.display = 'flex';
+            }
+        }
+
+        function handleSignalSelectChange() {
+            const sel = document.getElementById('signal-file-select').value;
+            const btnBrowse = document.getElementById('btn-browse-csv');
+            const lblName = document.getElementById('custom-csv-name');
+            if (sel === 'custom_upload') {
+                btnBrowse.style.display = 'inline-block';
+                lblName.style.display = 'inline-block';
+                document.getElementById('signal-file-upload').click();
+            } else {
+                btnBrowse.style.display = 'none';
+                lblName.style.display = 'none';
+            }
+        }
+
+        function handleCustomCsvUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            customCsvFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                customCsvContent = e.target.result;
+                const lbl = document.getElementById('custom-csv-name');
+                lbl.innerText = `Loaded: ${file.name}`;
+                lbl.style.display = 'inline-block';
+            };
+            reader.readAsText(file);
+        }
+
+        async function triggerLLMAudit() {
+            // Switch to LLM verification tab and trigger verification
+            document.querySelectorAll('[data-info]').forEach(b => b.classList.remove('active'));
+            const tabBtn = document.querySelector('[data-info="llm-val"]');
+            if (tabBtn) tabBtn.classList.add('active');
+            document.querySelectorAll('.info-content').forEach(c => c.classList.add('hidden'));
+            const pane = document.getElementById('info-llm-val');
+            if (pane) pane.classList.remove('hidden');
+
+            await executeBacktest();
+        }
+
         async function executeBacktest() {
-            const ticker = tickerSelect.value;
-            const strategy = strategySelect.value;
+            const src = document.getElementById('source-select').value;
+            const sigFile = document.getElementById('signal-file-select') ? document.getElementById('signal-file-select').value : 'signalsmain2.py.csv';
+            const ticker = tickerSelect ? tickerSelect.value : 'INFY';
+            const strategy = strategySelect ? strategySelect.value : 'SMA';
             const shortW = document.getElementById('input-short-window').value;
             const longW = document.getElementById('input-long-window').value;
             const cap = document.getElementById('input-capital').value;
@@ -2232,8 +2470,27 @@ INDEX_HTML = """<!DOCTYPE html>
             loadingOverlay.classList.add('active');
 
             try {
-                const url = `/api/run?ticker=${ticker}&strategy=${strategy}&short_window=${shortW}&long_window=${longW}&capital=${cap}&position_size=${posSize}&commission=${comm}&slippage=${slip}&stop_loss=${sl}&take_profit=${tp}`;
-                const res = await fetch(url);
+                const payload = {
+                    source: src,
+                    signal_file: sigFile,
+                    file_content: (sigFile === 'custom_upload') ? customCsvContent : null,
+                    ticker: ticker,
+                    strategy: strategy,
+                    short_window: shortW,
+                    long_window: longW,
+                    capital: cap,
+                    position_size: posSize,
+                    commission: comm,
+                    slippage: slip,
+                    stop_loss: sl,
+                    take_profit: tp
+                };
+
+                const res = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
 
                 if (data.status === 'success') {
@@ -2246,6 +2503,7 @@ INDEX_HTML = """<!DOCTYPE html>
 
                     currentChartBundle = data.charts;
                     updateChartDisplay();
+
                     if (data.llm_audit_table && data.llm_audit_table.length > 0) {
                         renderLLMValidationTable(data.llm_audit_table);
                     }
